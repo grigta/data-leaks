@@ -1,0 +1,16 @@
+{
+	"dashboard": "Dashboard",
+	"instantSSN": "Instant SSN",
+	"manualSSN": "Manual SSN",
+	"orders": "Orders",
+	"cart": "Cart",
+	"api": "API",
+	"telegram": "Telegram Bot",
+	"support": "Support",
+	"contact": "Contact",
+	"balance": "Balance",
+	"profile": "Profile",
+	"addBalance": "Add Balance",
+	"logout": "Logout",
+	"loggingOut": "Logging out..."
+}

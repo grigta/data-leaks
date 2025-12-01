@@ -1,0 +1,52 @@
+{
+	"title": "Выберите криптовалюту",
+	"subtitle": "Выберите способ оплаты для пополнения средств",
+	"selectProvider": "Выберите платежный провайдер",
+	"providerCrypto": "Крипто (CryptoCurrencyAPI)",
+	"providerCryptoDesc": "Быстрые депозиты через CryptoCurrencyAPI",
+	"providerFFIO": "ff.io (FixedFloat)",
+	"providerFFIODesc": "Обмен и депозит через FixedFloat",
+	"currencies": {
+		"usdt_trc20": {
+			"name": "USDT (TRC20)",
+			"description": "Быстро и низкие комиссии"
+		},
+		"usdt_erc20": {
+			"name": "USDT (ERC20)",
+			"description": "Сеть Ethereum"
+		},
+		"btc": {
+			"name": "Bitcoin (BTC)",
+			"description": "Сеть Bitcoin"
+		},
+		"ltc": {
+			"name": "Litecoin (LTC)",
+			"description": "Сеть Litecoin"
+		}
+	},
+	"depositPage": {
+		"title": "Пополнение {{currency}}",
+		"amount": "Сумма (USD)",
+		"amountPlaceholder": "Введите сумму в USD",
+		"minAmount": "Минимум: $5.00",
+		"maxAmount": "Максимум: $5,000.00",
+		"createDeposit": "Создать пополнение",
+		"creating": "Создание...",
+		"paymentInfo": "Информация о платеже",
+		"address": "Адрес для оплаты",
+		"amountToPay": "Сумма к оплате",
+		"expiresAt": "Истекает",
+		"status": "Статус",
+		"copyAddress": "Копировать адрес",
+		"copied": "Скопировано!",
+		"backToCrypto": "Назад к выбору криптовалюты",
+		"ffioWarning": "После оплаты средства поступят после подтверждения обмена. Обычно это занимает 10-30 минут. Убедитесь, что вы отправляете точную сумму на указанный адрес."
+	},
+	"messages": {
+		"invalidAmount": "Введите корректную сумму",
+		"minAmountError": "Минимальная сумма пополнения: $5.00",
+		"maxAmountError": "Максимальная сумма пополнения: $5,000.00",
+		"depositCreated": "Пополнение создано успешно!",
+		"depositFailed": "Не удалось создать пополнение"
+	}
+}

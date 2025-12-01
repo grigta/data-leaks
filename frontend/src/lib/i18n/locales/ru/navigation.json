@@ -1,0 +1,16 @@
+{
+	"dashboard": "Панель",
+	"instantSSN": "Поиск SSN",
+	"manualSSN": "Ручной SSN",
+	"orders": "Заказы",
+	"cart": "Корзина",
+	"api": "API",
+	"telegram": "Telegram Бот",
+	"support": "Поддержка",
+	"contact": "Контакты",
+	"balance": "Баланс",
+	"profile": "Профиль",
+	"addBalance": "Пополнить баланс",
+	"logout": "Выход",
+	"loggingOut": "Выход..."
+}

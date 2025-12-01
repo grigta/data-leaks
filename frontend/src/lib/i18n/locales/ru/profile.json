@@ -1,0 +1,39 @@
+{
+	"title": "Профиль",
+	"userInfo": "Информация о пользователе",
+	"username": "Имя пользователя",
+	"userId": "ID пользователя",
+	"balance": "Баланс:",
+	"registeredDate": "Дата регистрации",
+	"logout": "Выйти",
+	"loggingOut": "Выход...",
+	"deposit": "Пополнить",
+	"telegram": "Telegram",
+	"jabber": "Jabber",
+	"email": "Email",
+	"notSet": "Не установлено",
+	"changePassword": "Изменить пароль",
+	"setPassword": "Установить пароль",
+	"editField": "Редактировать {{field}}",
+	"updateField": "Обновить информацию {{field}}",
+	"currentPassword": "Текущий пароль",
+	"newPassword": "Новый пароль",
+	"confirmPassword": "Подтвердите новый пароль",
+	"newPasswordPlaceholder": "Минимум 8 символов",
+	"confirmPasswordPlaceholder": "Введите новый пароль еще раз",
+	"cancel": "Отмена",
+	"save": "Сохранить",
+	"saving": "Сохранение...",
+	"enterCurrent": "Введите текущий пароль и выберите новый",
+	"setPasswordDesc": "Установите пароль для вашего аккаунта",
+	"errors": {
+		"fieldEmpty": "Поле не может быть пустым",
+		"currentPasswordRequired": "Требуется текущий пароль",
+		"passwordTooShort": "Новый пароль должен содержать минимум 8 символов",
+		"passwordsNoMatch": "Пароли не совпадают"
+	},
+	"success": {
+		"fieldUpdated": "{{field}} успешно обновлен",
+		"passwordSet": "Пароль успешно установлен"
+	}
+}

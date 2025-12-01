@@ -1,0 +1,42 @@
+{
+	"title": "Balance",
+	"currentBalance": "Current Balance",
+	"totalDeposits": "Total Deposits",
+	"addFunds": "Add Funds",
+	"amount": "Amount",
+	"amountPlaceholder": "Enter amount in USD",
+	"minAmount": "Minimum deposit amount: $5.00",
+	"maxAmount": "Maximum deposit amount: $5,000.00",
+	"createTransaction": "Create Transaction",
+	"creating": "Creating transaction...",
+	"paymentInstructions": "Payment Instructions",
+	"paymentAddress": "Payment Address",
+	"paymentAmount": "Amount to Pay",
+	"paymentExpires": "Expires",
+	"paymentStatus": "Status",
+	"copyAddress": "Copy Address",
+	"addressCopied": "Address copied!",
+	"transactionHistory": "Transaction History",
+	"noTransactions": "No transactions yet",
+	"table": {
+		"date": "Date",
+		"amount": "Amount",
+		"currency": "Currency",
+		"status": "Status",
+		"address": "Address"
+	},
+	"statuses": {
+		"pending": "Pending",
+		"paid": "Paid",
+		"expired": "Expired",
+		"failed": "Failed"
+	},
+	"messages": {
+		"invalidAmount": "Enter a valid amount",
+		"minAmountError": "Minimum deposit amount: $5.00",
+		"maxAmountError": "Maximum deposit amount: $5,000.00",
+		"transactionCreated": "Transaction created! Use the address below for payment.",
+		"transactionFailed": "Failed to create transaction",
+		"loadFailed": "Failed to load transactions"
+	}
+}

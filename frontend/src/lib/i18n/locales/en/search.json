@@ -1,0 +1,98 @@
+{
+	"instantSSN": {
+		"title": "Name Search",
+		"subtitle": "Search by first and last name",
+		"firstName": "First Name",
+		"firstNamePlaceholder": "Winston",
+		"middleName": "Middle Name",
+		"middleNamePlaceholder": "N",
+		"lastName": "Last Name",
+		"lastNamePlaceholder": "Smith",
+		"zip": "ZIP",
+		"zipPlaceholder": "00000",
+		"city": "City",
+		"cityPlaceholder": "London",
+		"state": "State",
+		"statePlaceholder": "FL",
+		"statesPlaceholder": "State",
+		"statesSelected": "{{count}} states selected",
+		"dob": "DOB",
+		"dobPlaceholder": "1984",
+		"last4ssn": "Last 4 ssn",
+		"last4ssnPlaceholder": "0000",
+		"email": "Email",
+		"emailPlaceholder": "ws1984@gmail.com",
+		"phone": "Phone number",
+		"phonePlaceholder": "000000000",
+		"searchButton": "Search",
+		"searching": "Searching...",
+		"clearButton": "Clear"
+	},
+	"results": {
+		"found": "Found {{count}} results",
+		"noResults": "No results found",
+		"table": {
+			"name": "Name",
+			"ssn": "SSN",
+			"dob": "DOB",
+			"email": "Email",
+			"phone": "Phone",
+			"city": "City",
+			"state": "State",
+			"price": "Price",
+			"actions": "Actions"
+		},
+		"addToCart": "Add to cart",
+		"addingToCart": "Adding...",
+		"inCart": "In cart"
+	},
+	"messages": {
+		"searchFailed": "Search failed",
+		"addedToCart": "Added to cart",
+		"addToCartFailed": "Failed to add to cart",
+		"enrichmentInProgress": "Actualizing data...",
+		"enrichmentAndAddingToCart": "Actualizing and adding to cart...",
+		"enrichmentAndPurchasing": "Actualizing and purchasing...",
+		"enrichedAndAdded": "Data actualized and added to cart (cost: ${cost})",
+		"enrichedAndPurchased": "Data actualized and purchased (actualization cost: ${cost})"
+	},
+	"manualSsn": {
+		"title": "Manual SSN Lookup",
+		"subtitle": "Submit a request for manual SSN lookup by our team",
+		"costInfo": "Request cost: ${{cost}}",
+		"insufficientBalance": "Insufficient balance. Required: ${{required}}, available: ${{available}}",
+		"fullName": "Full Name",
+		"fullNamePlaceholder": "John Doe",
+		"firstName": "First Name",
+		"firstNamePlaceholder": "John",
+		"lastName": "Last Name",
+		"lastNamePlaceholder": "Doe",
+		"address": "Full Address",
+		"addressPlaceholder": "123 Main St, City, State, ZIP",
+		"submitButton": "Submit Request",
+		"submitting": "Submitting...",
+		"successMessage": "Your request has been submitted. Ticket ID: {{ticketId}}",
+		"teamNote": "Our team will process your request and provide the full information (fullz) when available.",
+		"myRequests": "My Requests",
+		"noRequests": "No requests yet. Submit your first manual lookup request above.",
+		"status": {
+			"pending": "pending",
+			"processing": "processing",
+			"completed": "completed",
+			"rejected": "rejected",
+			"waitingForAssignment": "Waiting for assignment",
+			"beingProcessed": "Being processed",
+			"beingProcessedBy": "Being processed by {{worker}}",
+			"requestRejected": "Request rejected",
+			"requestRejectedReason": "Request rejected: {{reason}}"
+		},
+		"actions": {
+			"viewResponse": "View Response",
+			"hideResponse": "Hide Response"
+		},
+		"timestamps": {
+			"created": "Created: {{date}}",
+			"updated": "Updated: {{date}}"
+		}
+	}
+}

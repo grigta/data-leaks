@@ -1,0 +1,87 @@
+{
+	"title": "Orders",
+	"statuses": {
+		"all": "All",
+		"pending": "Pending",
+		"completed": "Completed",
+		"failed": "Failed",
+		"cancelled": "Cancelled"
+	},
+	"tabs": {
+		"all": "All Orders",
+		"allTooltip": "Includes Instant SSN, Manual SSN, and legacy orders",
+		"instantSSN": "Instant SSN",
+		"manualSSN": "Manual SSN",
+		"reverseSSN": "Reverse SSN"
+	},
+	"filters": {
+		"status": "Filter by status"
+	},
+	"actions": {
+		"refresh": "Refresh",
+		"exportCSV": "Export CSV",
+		"exportTXT": "Export TXT",
+		"copy": "Copy"
+	},
+	"productTypes": {
+		"instantSSN": "Instant SSN",
+		"reverseSSN": "Reverse SSN",
+		"manualSSN": "Manual SSN"
+	},
+	"table": {
+		"orderId": "Order ID",
+		"date": "Date",
+		"items": "Items",
+		"amount": "Amount",
+		"status": "Status",
+		"name": "Name",
+		"firstName": "First",
+		"lastName": "Last",
+		"dob": "DOB",
+		"actions": "Actions",
+		"email": "Email",
+		"phone": "Phone",
+		"city": "City",
+		"state": "State",
+		"total": "Total:",
+		"middleName": "Middle",
+		"fullAddress": "Full Address",
+		"emails": "Emails",
+		"phones": "Phones",
+		"ssn": "SSN",
+		"enrichmentStatus": "Actualization",
+		"selectAll": "Select All"
+	},
+	"selection": {
+		"ordersSelected": "{{count}} orders selected",
+		"clearSelection": "Clear Selection"
+	},
+	"details": {
+		"title": "Order Details",
+		"close": "Close"
+	},
+	"empty": {
+		"title": "No orders yet",
+		"subtitle": "Start shopping to see your orders here"
+	},
+	"pagination": {
+		"page": "Page {{current}} of {{total}}",
+		"previous": "Previous",
+		"next": "Next"
+	},
+	"messages": {
+		"loadFailed": "Failed to load orders",
+		"detailsFailed": "Failed to load order details",
+		"exportFailed": "Failed to export orders",
+		"copied": "Copied to clipboard",
+		"copyFailed": "Failed to copy",
+		"enrichmentPerformed": "Data actualized",
+		"enrichmentFailed": "Actualization failed, but record added"
+	},
+	"enrichment": {
+		"success": "Actualization successful",
+		"failed": "Actualization failed",
+		"none": "No actualization",
+		"status": "Actualization status"
+	}
+}

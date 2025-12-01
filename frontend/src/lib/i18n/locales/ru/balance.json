@@ -1,0 +1,42 @@
+{
+	"title": "Баланс",
+	"currentBalance": "Текущий баланс",
+	"totalDeposits": "Всего пополнено",
+	"addFunds": "Пополнить баланс",
+	"amount": "Сумма",
+	"amountPlaceholder": "Введите сумму в USD",
+	"minAmount": "Минимальная сумма пополнения: $5.00",
+	"maxAmount": "Максимальная сумма пополнения: $5,000.00",
+	"createTransaction": "Создать транзакцию",
+	"creating": "Создание транзакции...",
+	"paymentInstructions": "Инструкции по оплате",
+	"paymentAddress": "Адрес для оплаты",
+	"paymentAmount": "Сумма к оплате",
+	"paymentExpires": "Истекает",
+	"paymentStatus": "Статус",
+	"copyAddress": "Копировать адрес",
+	"addressCopied": "Адрес скопирован!",
+	"transactionHistory": "История транзакций",
+	"noTransactions": "Транзакций пока нет",
+	"table": {
+		"date": "Дата",
+		"amount": "Сумма",
+		"currency": "Валюта",
+		"status": "Статус",
+		"address": "Адрес"
+	},
+	"statuses": {
+		"pending": "В ожидании",
+		"paid": "Оплачено",
+		"expired": "Истекло",
+		"failed": "Не удалось"
+	},
+	"messages": {
+		"invalidAmount": "Введите корректную сумму",
+		"minAmountError": "Минимальная сумма пополнения: $5.00",
+		"maxAmountError": "Максимальная сумма пополнения: $5,000.00",
+		"transactionCreated": "Транзакция создана! Используйте адрес ниже для оплаты.",
+		"transactionFailed": "Не удалось создать транзакцию",
+		"loadFailed": "Не удалось загрузить транзакции"
+	}
+}

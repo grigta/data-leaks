@@ -1,0 +1,52 @@
+{
+	"title": "Choose Cryptocurrency",
+	"subtitle": "Select a payment method to add funds",
+	"selectProvider": "Select Payment Provider",
+	"providerCrypto": "Crypto (CryptoCurrencyAPI)",
+	"providerCryptoDesc": "Fast deposits via CryptoCurrencyAPI",
+	"providerFFIO": "ff.io (FixedFloat)",
+	"providerFFIODesc": "Exchange and deposit via FixedFloat",
+	"currencies": {
+		"usdt_trc20": {
+			"name": "USDT (TRC20)",
+			"description": "Fast and low fees"
+		},
+		"usdt_erc20": {
+			"name": "USDT (ERC20)",
+			"description": "Ethereum network"
+		},
+		"btc": {
+			"name": "Bitcoin (BTC)",
+			"description": "Bitcoin network"
+		},
+		"ltc": {
+			"name": "Litecoin (LTC)",
+			"description": "Litecoin network"
+		}
+	},
+	"depositPage": {
+		"title": "Deposit {{currency}}",
+		"amount": "Amount (USD)",
+		"amountPlaceholder": "Enter amount in USD",
+		"minAmount": "Minimum: $5.00",
+		"maxAmount": "Maximum: $5,000.00",
+		"createDeposit": "Create Deposit",
+		"creating": "Creating...",
+		"paymentInfo": "Payment Information",
+		"address": "Payment Address",
+		"amountToPay": "Amount to Pay",
+		"expiresAt": "Expires",
+		"status": "Status",
+		"copyAddress": "Copy Address",
+		"copied": "Copied!",
+		"backToCrypto": "Back to Cryptocurrency Selection",
+		"ffioWarning": "After payment, funds will be credited after exchange confirmation. This usually takes 10-30 minutes. Make sure you send the exact amount to the provided address."
+	},
+	"messages": {
+		"invalidAmount": "Enter a valid amount",
+		"minAmountError": "Minimum deposit amount: $5.00",
+		"maxAmountError": "Maximum deposit amount: $5,000.00",
+		"depositCreated": "Deposit created successfully!",
+		"depositFailed": "Failed to create deposit"
+	}
+}

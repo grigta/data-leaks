@@ -1,0 +1,39 @@
+{
+	"title": "Profile",
+	"userInfo": "User Information",
+	"username": "Username",
+	"userId": "User ID",
+	"balance": "Balance:",
+	"registeredDate": "Registered",
+	"logout": "Log out",
+	"loggingOut": "Logging out...",
+	"deposit": "Deposit",
+	"telegram": "Telegram",
+	"jabber": "Jabber",
+	"email": "Email",
+	"notSet": "Not set",
+	"changePassword": "Change Password",
+	"setPassword": "Set Password",
+	"editField": "Edit {{field}}",
+	"updateField": "Update your {{field}} information",
+	"currentPassword": "Current Password",
+	"newPassword": "New Password",
+	"confirmPassword": "Confirm New Password",
+	"newPasswordPlaceholder": "At least 8 characters",
+	"confirmPasswordPlaceholder": "Re-enter new password",
+	"cancel": "Cancel",
+	"save": "Save",
+	"saving": "Saving...",
+	"enterCurrent": "Enter your current password and choose a new one",
+	"setPasswordDesc": "Set a password for your account",
+	"errors": {
+		"fieldEmpty": "Field cannot be empty",
+		"currentPasswordRequired": "Current password is required",
+		"passwordTooShort": "New password must be at least 8 characters",
+		"passwordsNoMatch": "Passwords do not match"
+	},
+	"success": {
+		"fieldUpdated": "{{field}} updated successfully",
+		"passwordSet": "Password set successfully"
+	}
+}

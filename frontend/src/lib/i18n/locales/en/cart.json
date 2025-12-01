@@ -1,0 +1,43 @@
+{
+	"title": "Cart",
+	"empty": {
+		"title": "Your cart is empty",
+		"subtitle": "Add items to start shopping",
+		"button": "Start Shopping"
+	},
+	"table": {
+		"name": "Name",
+		"ssn": "SSN",
+		"dob": "DOB",
+		"email": "Email",
+		"phone": "Phone",
+		"city": "City",
+		"state": "State",
+		"price": "Price",
+		"actions": "Actions"
+	},
+	"summary": {
+		"title": "Total",
+		"subtotal": "Subtotal:",
+		"tax": "Tax:",
+		"total": "Total:",
+		"currentBalance": "Current balance:",
+		"balanceAfter": "Balance after purchase:"
+	},
+	"actions": {
+		"placeOrder": "Place Order",
+		"processing": "Processing...",
+		"clearCart": "Clear Cart",
+		"remove": "Remove"
+	},
+	"messages": {
+		"itemRemoved": "Item removed from cart",
+		"cartCleared": "Cart cleared",
+		"orderSuccess": "Order placed successfully!",
+		"orderFailed": "Failed to place order. Please check your balance and try again.",
+		"removeFailed": "Failed to remove item",
+		"clearFailed": "Failed to clear cart",
+		"loadFailed": "Failed to load cart",
+		"insufficientBalance": "Insufficient balance. Please top up your account."
+	}
+}

@@ -1,0 +1,107 @@
+{
+	"instantSSN": {
+		"title": "Поиск по имени",
+		"subtitle": "Поиск по имени и фамилии",
+		"firstName": "Имя",
+		"firstNamePlaceholder": "Winston",
+		"middleName": "Отчество",
+		"middleNamePlaceholder": "N",
+		"lastName": "Фамилия",
+		"lastNamePlaceholder": "Smith",
+		"zip": "Индекс",
+		"zipPlaceholder": "00000",
+		"city": "Город",
+		"cityPlaceholder": "London",
+		"state": "Штат",
+		"statePlaceholder": "FL",
+		"statesPlaceholder": "State",
+		"statesSelected": "Выбрано штатов: {{count}}",
+		"dob": "Дата рождения",
+		"dobPlaceholder": "1984",
+		"last4ssn": "Последние 4 SSN",
+		"last4ssnPlaceholder": "0000",
+		"email": "Email",
+		"emailPlaceholder": "ws1984@gmail.com",
+		"phone": "Номер телефона",
+		"phonePlaceholder": "000000000",
+		"searchButton": "Искать",
+		"searching": "Поиск...",
+		"clearButton": "Очистить"
+	},
+	"results": {
+		"found": "Найдено {{count}} результатов",
+		"noResults": "Результаты не найдены",
+		"table": {
+			"name": "Имя",
+			"ssn": "SSN",
+			"dob": "Дата рождения",
+			"email": "Email",
+			"phone": "Телефон",
+			"city": "Город",
+			"state": "Штат",
+			"price": "Цена",
+			"actions": "Действия"
+		},
+		"addToCart": "В корзину",
+		"addingToCart": "Добавление...",
+		"inCart": "В корзине"
+	},
+	"common": {
+		"notFound": "Результаты не найдены",
+		"recordsFound": "Найдено записей:"
+	},
+	"cart": {
+		"add": "Добавить в корзину",
+		"adding": "Добавление...",
+		"inCart": "Уже в корзине"
+	},
+	"messages": {
+		"searchFailed": "Поиск не удался",
+		"addedToCart": "Добавлено в корзину",
+		"addToCartFailed": "Не удалось добавить в корзину",
+		"enrichmentInProgress": "Актуализация данных...",
+		"enrichmentAndAddingToCart": "Актуализация и добавление в корзину...",
+		"enrichmentAndPurchasing": "Актуализация и покупка...",
+		"enrichedAndAdded": "Данные актуализированы и добавлены в корзину (стоимость: ${cost})",
+		"enrichedAndPurchased": "Данные актуализированы и куплены (стоимость актуализации: ${cost})"
+	},
+	"manualSsn": {
+		"title": "Ручной поиск SSN",
+		"subtitle": "Отправьте запрос на ручной поиск SSN нашей командой",
+		"costInfo": "Стоимость запроса: ${{cost}}",
+		"insufficientBalance": "Недостаточно средств. Необходимо: ${{required}}, доступно: ${{available}}",
+		"fullName": "Полное имя",
+		"fullNamePlaceholder": "John Doe",
+		"firstName": "Имя",
+		"firstNamePlaceholder": "Иван",
+		"lastName": "Фамилия",
+		"lastNamePlaceholder": "Иванов",
+		"address": "Полный адрес",
+		"addressPlaceholder": "123 Main St, City, State, ZIP",
+		"submitButton": "Отправить запрос",
+		"submitting": "Отправка...",
+		"successMessage": "Ваш запрос отправлен. ID тикета: {{ticketId}}",
+		"teamNote": "Наша команда обработает ваш запрос и предоставит полную информацию (fullz), когда она будет доступна.",
+		"myRequests": "Мои запросы",
+		"noRequests": "Пока нет запросов. Отправьте свой первый запрос на ручной поиск выше.",
+		"status": {
+			"pending": "ожидание",
+			"processing": "обработка",
+			"completed": "выполнено",
+			"rejected": "отклонено",
+			"waitingForAssignment": "Ожидание назначения",
+			"beingProcessed": "В обработке",
+			"beingProcessedBy": "Обрабатывается {{worker}}",
+			"requestRejected": "Запрос отклонен",
+			"requestRejectedReason": "Запрос отклонен: {{reason}}"
+		},
+		"actions": {
+			"viewResponse": "Посмотреть ответ",
+			"hideResponse": "Скрыть ответ"
+		},
+		"timestamps": {
+			"created": "Создано: {{date}}",
+			"updated": "Обновлено: {{date}}"
+		}
+	}
+}

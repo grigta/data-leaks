@@ -1,0 +1,87 @@
+{
+	"title": "Заказы",
+	"statuses": {
+		"all": "Все",
+		"pending": "В ожидании",
+		"completed": "Завершен",
+		"failed": "Не удался",
+		"cancelled": "Отменен"
+	},
+	"tabs": {
+		"all": "Все заказы",
+		"allTooltip": "Включает Instant SSN, Manual SSN и устаревшие заказы",
+		"instantSSN": "Instant SSN",
+		"manualSSN": "Manual SSN",
+		"reverseSSN": "Reverse SSN"
+	},
+	"filters": {
+		"status": "Фильтр по статусу"
+	},
+	"actions": {
+		"refresh": "Обновить",
+		"exportCSV": "Экспорт CSV",
+		"exportTXT": "Экспорт TXT",
+		"copy": "Копировать"
+	},
+	"productTypes": {
+		"instantSSN": "Instant SSN",
+		"reverseSSN": "Обратный SSN",
+		"manualSSN": "Manual SSN"
+	},
+	"table": {
+		"orderId": "ID заказа",
+		"date": "Дата",
+		"items": "Товары",
+		"amount": "Сумма",
+		"status": "Статус",
+		"name": "Имя",
+		"firstName": "Имя",
+		"lastName": "Фамилия",
+		"dob": "Дата рожд.",
+		"actions": "Действия",
+		"email": "Email",
+		"phone": "Телефон",
+		"city": "Город",
+		"state": "Штат",
+		"total": "Итого:",
+		"middleName": "Отчество",
+		"fullAddress": "Полный адрес",
+		"emails": "Email",
+		"phones": "Телефоны",
+		"ssn": "SSN",
+		"enrichmentStatus": "Актуализация",
+		"selectAll": "Выбрать все"
+	},
+	"selection": {
+		"ordersSelected": "Выбрано заказов: {{count}}",
+		"clearSelection": "Снять выделение"
+	},
+	"details": {
+		"title": "Детали заказа",
+		"close": "Закрыть"
+	},
+	"empty": {
+		"title": "Заказов пока нет",
+		"subtitle": "Начните покупки, чтобы увидеть ваши заказы здесь"
+	},
+	"pagination": {
+		"page": "Страница {{current}} из {{total}}",
+		"previous": "Предыдущая",
+		"next": "Следующая"
+	},
+	"messages": {
+		"loadFailed": "Не удалось загрузить заказы",
+		"detailsFailed": "Не удалось загрузить детали заказа",
+		"exportFailed": "Не удалось экспортировать заказы",
+		"copied": "Скопировано в буфер обмена",
+		"copyFailed": "Не удалось скопировать",
+		"enrichmentPerformed": "Данные актуализированы",
+		"enrichmentFailed": "Актуализация не удалась, но запись добавлена"
+	},
+	"enrichment": {
+		"success": "Актуализация успешная",
+		"failed": "Актуализация не удалась",
+		"none": "Без актуализации",
+		"status": "Статус актуализации"
+	}
+}
