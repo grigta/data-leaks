@@ -189,72 +189,67 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          DATABASE_URL=postgresql+asyncpg://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.POSTGRES_DB }}
+          SQLITE_PATH=/app/data/ssn_database.db
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_ALGORITHM=HS256
+          JWT_EXPIRATION_HOURS=24
+          ENRICHMENT_API_KEYS=${{ secrets.ENRICHMENT_API_KEYS }}
+          WEBHOOK_SECRET=${{ secrets.WEBHOOK_SECRET }}
+          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+          ORIGIN=${{ secrets.ORIGIN }}
+          SEARCHBUG_CO_CODE=${{ secrets.SEARCHBUG_CO_CODE }}
+          SEARCHBUG_PASSWORD=${{ secrets.SEARCHBUG_PASSWORD }}
+          SEARCHBUG_API_URL=https://data.searchbug.com/api/search.aspx
+          SEARCHBUG_DEFAULT_LIMIT=100
+          CRYPTOCURRENCYAPI_KEY=${{ secrets.CRYPTOCURRENCYAPI_KEY }}
+          IPN_WEBHOOK_URL=https://data-leaks.cc/api/public/billing/ipn/cryptocurrencyapi
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BOT_API_KEY=${{ secrets.BOT_API_KEY }}
+          PUBLIC_API_URL=http://public_api:8000
+          WS_RECONNECT_DELAY=5
+          WS_MAX_RECONNECT_DELAY=300
+          WS_HEARTBEAT_INTERVAL=30
+          INTERNAL_API_KEY=${{ secrets.INTERNAL_API_KEY }}
+          PUBLIC_API_INTERNAL_URL=http://public_api:8000
+          REDIS_URL=redis://redis:6379/0
+          DB_POOL_SIZE=30
+          DB_MAX_OVERFLOW=20
+          DB_POOL_TIMEOUT=30
+          DB_POOL_RECYCLE=1800
+          DB_POOL_PRE_PING=true
+          UVICORN_WORKERS=4
+          UVICORN_WORKERS_ADMIN=2
+          LOG_LEVEL=INFO
+          EOF
+          sed -i 's/^[[:space:]]*//' .env
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy .env to server
+        run: |
+          scp -P ${{ secrets.DEPLOY_PORT }} -i ~/.ssh/deploy_key .env ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/root/soft/.env
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          ENRICHMENT_API_KEYS: ${{ secrets.ENRICHMENT_API_KEYS }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
-          ORIGIN: ${{ secrets.ORIGIN }}
-          SEARCHBUG_CO_CODE: ${{ secrets.SEARCHBUG_CO_CODE }}
-          SEARCHBUG_PASSWORD: ${{ secrets.SEARCHBUG_PASSWORD }}
-          CRYPTOCURRENCYAPI_KEY: ${{ secrets.CRYPTOCURRENCYAPI_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          BOT_API_KEY: ${{ secrets.BOT_API_KEY }}
-          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT }}
-          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,JWT_SECRET,ENRICHMENT_API_KEYS,WEBHOOK_SECRET,ALLOWED_ORIGINS,ORIGIN,SEARCHBUG_CO_CODE,SEARCHBUG_PASSWORD,CRYPTOCURRENCYAPI_KEY,TELEGRAM_BOT_TOKEN,BOT_API_KEY,INTERNAL_API_KEY,GHCR_TOKEN,GITHUB_ACTOR
-          script: |
-            cd /root/soft
-            git pull origin main
-            echo "POSTGRES_USER=$POSTGRES_USER" > .env
-            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
-            echo "POSTGRES_DB=$POSTGRES_DB" >> .env
-            echo "DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" >> .env
-            echo "SQLITE_PATH=/app/data/ssn_database.db" >> .env
-            echo "JWT_SECRET=$JWT_SECRET" >> .env
-            echo "JWT_ALGORITHM=HS256" >> .env
-            echo "JWT_EXPIRATION_HOURS=24" >> .env
-            echo "ENRICHMENT_API_KEYS=$ENRICHMENT_API_KEYS" >> .env
-            echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> .env
-            echo "ALLOWED_ORIGINS=$ALLOWED_ORIGINS" >> .env
-            echo "ORIGIN=$ORIGIN" >> .env
-            echo "SEARCHBUG_CO_CODE=$SEARCHBUG_CO_CODE" >> .env
-            echo "SEARCHBUG_PASSWORD=$SEARCHBUG_PASSWORD" >> .env
-            echo "SEARCHBUG_API_URL=https://data.searchbug.com/api/search.aspx" >> .env
-            echo "SEARCHBUG_DEFAULT_LIMIT=100" >> .env
-            echo "CRYPTOCURRENCYAPI_KEY=$CRYPTOCURRENCYAPI_KEY" >> .env
-            echo "IPN_WEBHOOK_URL=https://data-leaks.cc/api/public/billing/ipn/cryptocurrencyapi" >> .env
-            echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" >> .env
-            echo "BOT_API_KEY=$BOT_API_KEY" >> .env
-            echo "PUBLIC_API_URL=http://public_api:8000" >> .env
-            echo "WS_RECONNECT_DELAY=5" >> .env
-            echo "WS_MAX_RECONNECT_DELAY=300" >> .env
-            echo "WS_HEARTBEAT_INTERVAL=30" >> .env
-            echo "INTERNAL_API_KEY=$INTERNAL_API_KEY" >> .env
-            echo "PUBLIC_API_INTERNAL_URL=http://public_api:8000" >> .env
-            echo "REDIS_URL=redis://redis:6379/0" >> .env
-            echo "DB_POOL_SIZE=30" >> .env
-            echo "DB_MAX_OVERFLOW=20" >> .env
-            echo "DB_POOL_TIMEOUT=30" >> .env
-            echo "DB_POOL_RECYCLE=1800" >> .env
-            echo "DB_POOL_PRE_PING=true" >> .env
-            echo "UVICORN_WORKERS=4" >> .env
-            echo "UVICORN_WORKERS_ADMIN=2" >> .env
-            echo "LOG_LEVEL=INFO" >> .env
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
-            sleep 10
-            docker image prune -af --filter "until=168h"
-            echo "Deploy completed successfully!"
+        run: |
+          ssh -p ${{ secrets.DEPLOY_PORT }} -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
+          cd /root/soft
+          git pull origin main
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker-compose pull
+          docker-compose up -d --remove-orphans
+          sleep 10
+          docker image prune -af --filter "until=168h"
+          echo "Deploy completed!"
+          ENDSSH
