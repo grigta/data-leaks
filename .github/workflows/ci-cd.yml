@@ -60,10 +60,20 @@ jobs:
         working-directory: ${{ matrix.frontend }}
         run: pnpm install --no-frozen-lockfile
 
+      - name: Cache tsbuildinfo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ matrix.frontend }}/.svelte-kit
+            ${{ matrix.frontend }}/tsconfig.tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ matrix.frontend }}-${{ hashFiles(format('{0}/pnpm-lock.yaml', matrix.frontend)) }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-${{ matrix.frontend }}-
+
       - name: Type check
         working-directory: ${{ matrix.frontend }}
         env:
-          NODE_OPTIONS: --max_old_space_size=8192
+          NODE_OPTIONS: --max_old_space_size=6144
         run: pnpm run check
 
   # ==========================================

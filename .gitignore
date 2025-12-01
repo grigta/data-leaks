@@ -57,6 +57,7 @@ backups/
 
 # Node.js
 node_modules/
+*.tsbuildinfo
 
 # Logs
 *.log

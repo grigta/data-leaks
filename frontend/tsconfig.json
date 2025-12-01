@@ -11,7 +11,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowJs": true,
-    "checkJs": true
+    "checkJs": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
 }
