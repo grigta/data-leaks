@@ -154,6 +154,9 @@ jobs:
           - name: admin-frontend
             dockerfile: Dockerfile
             context: ./admin-frontend
+          - name: lookup-frontend
+            dockerfile: Dockerfile
+            context: ./lookup-frontend
 
     steps:
       - uses: actions/checkout@v4

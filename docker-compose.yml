@@ -39,9 +39,7 @@ services:
 
   # Public API service
   public_api:
-    build:
-      context: .
-      dockerfile: Dockerfile.public
+    image: ghcr.io/grigta/public-api:latest
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,9 +92,7 @@ services:
 
   # Enrichment API service
   enrichment_api:
-    build:
-      context: .
-      dockerfile: Dockerfile.enrichment
+    image: ghcr.io/grigta/enrichment-api:latest
     environment:
       SQLITE_PATH: ${SQLITE_PATH:-/app/data/ssn_database.db}
       ENRICHMENT_API_KEYS: ${ENRICHMENT_API_KEYS:-key1_change_me,key2_change_me,key3_change_me}
@@ -111,9 +107,7 @@ services:
 
   # Admin API service
   admin_api:
-    build:
-      context: .
-      dockerfile: Dockerfile.admin
+    image: ghcr.io/grigta/admin-api:latest
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,9 +137,7 @@ services:
 
   # Telegram Bot service
   telegram_bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
+    image: ghcr.io/grigta/telegram-bot:latest
     depends_on:
       postgres:
         condition: service_healthy
@@ -175,9 +167,7 @@ services:
 
   # Lookup API service
   lookup_api:
-    build:
-      context: .
-      dockerfile: Dockerfile.lookup
+    image: ghcr.io/grigta/lookup-api:latest
     environment:
       SQLITE_PATH: ${SQLITE_PATH:-/app/data/ssn_database.db}
       WHITEPAGES_API_KEY: ${WHITEPAGES_API_KEY}
@@ -200,9 +190,7 @@ services:
 
   # Lookup Frontend service
   lookup_frontend:
-    build:
-      context: ./lookup-frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/grigta/lookup-frontend:latest
     ports:
       - "127.0.0.1:3002:80"
     networks:
@@ -216,9 +204,7 @@ services:
 
   # Frontend service (public) - PRODUCTION mode
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/grigta/frontend:latest
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -238,9 +224,7 @@ services:
 
   # Admin Frontend service - PRODUCTION mode
   admin_frontend:
-    build:
-      context: ./admin-frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/grigta/admin-frontend:latest
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -289,10 +273,6 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
-  frontend_node_modules:
-    driver: local
-  admin_node_modules:
     driver: local
 
 networks:
