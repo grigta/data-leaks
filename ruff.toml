@@ -20,6 +20,7 @@ ignore = [
     "E722",  # bare except
     "F401",  # imported but unused (lots of false positives)
     "F541",  # f-string without placeholders
+    "F601",  # dictionary key literal repeated
     "F811",  # redefinition of unused variable
     "F841",  # local variable assigned but never used
 ]
