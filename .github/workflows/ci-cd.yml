@@ -216,85 +216,45 @@ jobs:
           envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,JWT_SECRET,ENRICHMENT_API_KEYS,WEBHOOK_SECRET,ALLOWED_ORIGINS,ORIGIN,SEARCHBUG_CO_CODE,SEARCHBUG_PASSWORD,CRYPTOCURRENCYAPI_KEY,TELEGRAM_BOT_TOKEN,BOT_API_KEY,INTERNAL_API_KEY,GHCR_TOKEN,GITHUB_ACTOR
           script: |
             cd /root/soft
-
-            # Pull latest code
             git pull origin main
-
-            # Generate .env from GitHub Secrets
-            cat > .env << EOF
-            # PostgreSQL Configuration
-            POSTGRES_USER=${POSTGRES_USER}
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            POSTGRES_DB=${POSTGRES_DB}
-            DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-
-            # SQLite Configuration
-            SQLITE_PATH=/app/data/ssn_database.db
-
-            # JWT Configuration
-            JWT_SECRET=${JWT_SECRET}
-            JWT_ALGORITHM=HS256
-            JWT_EXPIRATION_HOURS=24
-
-            # API Keys
-            ENRICHMENT_API_KEYS=${ENRICHMENT_API_KEYS}
-            WEBHOOK_SECRET=${WEBHOOK_SECRET}
-
-            # CORS Configuration
-            ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-            ORIGIN=${ORIGIN}
-
-            # SearchBug API
-            SEARCHBUG_CO_CODE=${SEARCHBUG_CO_CODE}
-            SEARCHBUG_PASSWORD=${SEARCHBUG_PASSWORD}
-            SEARCHBUG_API_URL=https://data.searchbug.com/api/search.aspx
-            SEARCHBUG_DEFAULT_LIMIT=100
-
-            # Cryptocurrency API
-            CRYPTOCURRENCYAPI_KEY=${CRYPTOCURRENCYAPI_KEY}
-            IPN_WEBHOOK_URL=https://data-leaks.cc/api/public/billing/ipn/cryptocurrencyapi
-
-            # Telegram Bot
-            TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-            BOT_API_KEY=${BOT_API_KEY}
-            PUBLIC_API_URL=http://public_api:8000
-            WS_RECONNECT_DELAY=5
-            WS_MAX_RECONNECT_DELAY=300
-            WS_HEARTBEAT_INTERVAL=30
-
-            # Internal API
-            INTERNAL_API_KEY=${INTERNAL_API_KEY}
-            PUBLIC_API_INTERNAL_URL=http://public_api:8000
-
-            # Redis
-            REDIS_URL=redis://redis:6379/0
-
-            # Database Pool
-            DB_POOL_SIZE=30
-            DB_MAX_OVERFLOW=20
-            DB_POOL_TIMEOUT=30
-            DB_POOL_RECYCLE=1800
-            DB_POOL_PRE_PING=true
-
-            # Uvicorn Workers
-            UVICORN_WORKERS=4
-            UVICORN_WORKERS_ADMIN=2
-
-            # Logging
-            LOG_LEVEL=INFO
-            EOF
-
-            # Login to GHCR
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u ${GITHUB_ACTOR} --password-stdin
-
-            # Pull new images & restart
+            echo "POSTGRES_USER=$POSTGRES_USER" > .env
+            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
+            echo "POSTGRES_DB=$POSTGRES_DB" >> .env
+            echo "DATABASE_URL=postgresql+asyncpg://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" >> .env
+            echo "SQLITE_PATH=/app/data/ssn_database.db" >> .env
+            echo "JWT_SECRET=$JWT_SECRET" >> .env
+            echo "JWT_ALGORITHM=HS256" >> .env
+            echo "JWT_EXPIRATION_HOURS=24" >> .env
+            echo "ENRICHMENT_API_KEYS=$ENRICHMENT_API_KEYS" >> .env
+            echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> .env
+            echo "ALLOWED_ORIGINS=$ALLOWED_ORIGINS" >> .env
+            echo "ORIGIN=$ORIGIN" >> .env
+            echo "SEARCHBUG_CO_CODE=$SEARCHBUG_CO_CODE" >> .env
+            echo "SEARCHBUG_PASSWORD=$SEARCHBUG_PASSWORD" >> .env
+            echo "SEARCHBUG_API_URL=https://data.searchbug.com/api/search.aspx" >> .env
+            echo "SEARCHBUG_DEFAULT_LIMIT=100" >> .env
+            echo "CRYPTOCURRENCYAPI_KEY=$CRYPTOCURRENCYAPI_KEY" >> .env
+            echo "IPN_WEBHOOK_URL=https://data-leaks.cc/api/public/billing/ipn/cryptocurrencyapi" >> .env
+            echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" >> .env
+            echo "BOT_API_KEY=$BOT_API_KEY" >> .env
+            echo "PUBLIC_API_URL=http://public_api:8000" >> .env
+            echo "WS_RECONNECT_DELAY=5" >> .env
+            echo "WS_MAX_RECONNECT_DELAY=300" >> .env
+            echo "WS_HEARTBEAT_INTERVAL=30" >> .env
+            echo "INTERNAL_API_KEY=$INTERNAL_API_KEY" >> .env
+            echo "PUBLIC_API_INTERNAL_URL=http://public_api:8000" >> .env
+            echo "REDIS_URL=redis://redis:6379/0" >> .env
+            echo "DB_POOL_SIZE=30" >> .env
+            echo "DB_MAX_OVERFLOW=20" >> .env
+            echo "DB_POOL_TIMEOUT=30" >> .env
+            echo "DB_POOL_RECYCLE=1800" >> .env
+            echo "DB_POOL_PRE_PING=true" >> .env
+            echo "UVICORN_WORKERS=4" >> .env
+            echo "UVICORN_WORKERS_ADMIN=2" >> .env
+            echo "LOG_LEVEL=INFO" >> .env
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
-
-            # Wait for services to start
             sleep 10
-
-            # Cleanup old images
             docker image prune -af --filter "until=168h"
-
             echo "Deploy completed successfully!"
