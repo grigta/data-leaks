@@ -1,0 +1,50 @@
+# Multi-stage build для Telegram бота
+# Stage 1: Builder - установка зависимостей
+FROM python:3.11-slim as builder
+
+# Установка build dependencies
+RUN apt-get update && apt-get install -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Создание virtual environment
+RUN python -m venv /opt/venv
+
+# Активация venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Копирование requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+
+# Установка Python зависимостей
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Stage 2: Runtime - минимальный образ для запуска
+FROM python:3.11-slim
+
+# Копирование virtual environment из builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Установка PATH для использования venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Создание non-root пользователя
+RUN useradd -m -u 1000 appuser
+
+# Установка рабочей директории
+WORKDIR /app
+
+# Копирование только необходимых модулей для бота
+COPY --chown=appuser:appuser bot/ /app/bot
+COPY --chown=appuser:appuser api/common/ /app/api/common
+COPY --chown=appuser:appuser api/__init__.py /app/api/__init__.py
+COPY --chown=appuser:appuser database/ /app/database
+
+# Переключение на non-root пользователя
+USER appuser
+
+# Добавить /app в PYTHONPATH чтобы импорты работали
+ENV PYTHONPATH=/app
+
+# Запуск бота
+CMD ["python", "bot/main.py"]

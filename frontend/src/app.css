@@ -1,0 +1,335 @@
+@custom-variant dark;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 47.4% 11.2%;
+    --radius: 0.5rem;
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 221.2 83.2% 53.3%;
+    --info-foreground: 210 40% 98%;
+
+    /* Sidebar variables */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 222.2 47.4% 11.2%;
+
+    /* Sidebar variables for dark theme */
+    --sidebar-background: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+  }
+
+  * {
+    font-family: 'Montserrat Alternates', sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+@layer utilities {
+  .container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Sidebar animations */
+  .sidebar-enter {
+    transition: width 0.3s ease-in-out, opacity 0.2s ease-in-out;
+  }
+
+  .sidebar-leave {
+    transition: width 0.3s ease-in-out, opacity 0.2s ease-in-out;
+  }
+
+  /* Active nav item styling */
+  .nav-item-active {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  /* Custom scrollbar for main content */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-md;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
+  /* Search results table layout */
+  .search-results-grid {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .search-results-grid th,
+  .search-results-grid td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  /* Expand icon */
+  .search-results-grid th:nth-child(1),
+  .search-results-grid td:nth-child(1) {
+    width: 48px;
+    min-width: 48px;
+  }
+
+  /* First Name */
+  .search-results-grid th:nth-child(2),
+  .search-results-grid td:nth-child(2) {
+    width: 100px;
+    min-width: 100px;
+  }
+
+  /* Middle Name */
+  .search-results-grid th:nth-child(3),
+  .search-results-grid td:nth-child(3) {
+    width: 80px;
+    min-width: 80px;
+  }
+
+  /* Last Name */
+  .search-results-grid th:nth-child(4),
+  .search-results-grid td:nth-child(4) {
+    width: 100px;
+    min-width: 100px;
+  }
+
+  /* DOB */
+  .search-results-grid th:nth-child(5),
+  .search-results-grid td:nth-child(5) {
+    width: 120px;
+    min-width: 120px;
+  }
+
+  /* Last 4 SSN */
+  .search-results-grid th:nth-child(6),
+  .search-results-grid td:nth-child(6) {
+    width: 100px;
+    min-width: 100px;
+  }
+
+  /* Full Address */
+  .search-results-grid th:nth-child(7),
+  .search-results-grid td:nth-child(7) {
+    width: 350px;
+    min-width: 350px;
+  }
+
+  /* Emails */
+  .search-results-grid th:nth-child(8),
+  .search-results-grid td:nth-child(8) {
+    width: 70px;
+    min-width: 70px;
+  }
+
+  /* Phones */
+  .search-results-grid th:nth-child(9),
+  .search-results-grid td:nth-child(9) {
+    width: 70px;
+    min-width: 70px;
+  }
+
+  /* Price */
+  .search-results-grid th:nth-child(10),
+  .search-results-grid td:nth-child(10) {
+    width: 80px;
+    min-width: 80px;
+  }
+
+  /* Actions */
+  .search-results-grid-with-actions th:nth-child(11),
+  .search-results-grid-with-actions td:nth-child(11) {
+    width: 140px;
+    min-width: 140px;
+  }
+
+  .search-results-grid .cell-no-truncate {
+    white-space: normal;
+    overflow: visible;
+  }
+
+  /* View Transitions API animations */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes slide-from-right {
+    from {
+      transform: translateX(30px);
+    }
+  }
+
+  @keyframes slide-to-left {
+    to {
+      transform: translateX(-30px);
+    }
+  }
+
+  /* View Transition pseudo-elements */
+  ::view-transition-old(root) {
+    animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out,
+      200ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+  }
+
+  ::view-transition-new(root) {
+    animation: 300ms cubic-bezier(0, 0, 0.2, 1) both fade-in,
+      300ms cubic-bezier(0, 0, 0.2, 1) both slide-from-right;
+  }
+
+  /* Custom animation utilities */
+  .animate-fade-in {
+    animation: fade-in 200ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  .animate-slide-up {
+    animation: slide-up 200ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  @keyframes slide-up {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 200ms cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  @keyframes scale-in {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Fixed duration classes for animations to avoid JIT issues */
+  .duration-fast {
+    transition-duration: 150ms;
+  }
+
+  .duration-normal {
+    transition-duration: 300ms;
+  }
+
+  .duration-slow {
+    transition-duration: 500ms;
+  }
+
+  .duration-slower {
+    transition-duration: 700ms;
+  }
+
+  /* Code block styling */
+  .code-block {
+    @apply rounded bg-muted px-2 py-1 text-sm font-mono;
+  }
+
+  /* Status badge utilities */
+  .badge-success {
+    @apply bg-success/10 text-success border-success/20;
+  }
+
+  .badge-warning {
+    @apply bg-warning/10 text-warning border-warning/20;
+  }
+
+  .badge-info {
+    @apply bg-info/10 text-info border-info/20;
+  }
+
+  .badge-error {
+    @apply bg-destructive/10 text-destructive border-destructive/20;
+  }
+
+  /* Logo styling */
+  .font-michroma {
+    font-family: 'Michroma', sans-serif;
+  }
+}

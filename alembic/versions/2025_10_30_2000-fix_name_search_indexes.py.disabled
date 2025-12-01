@@ -1,0 +1,145 @@
+"""Fix name search indexes with COLLATE NOCASE
+
+Revision ID: c3d4e5f6g7h8
+Revises: b2c3d4e5f6g7
+Create Date: 2025-10-30 20:00:00.000000
+
+Note: This migration is for SQLite database (ssn_database.db), not PostgreSQL.
+It recreates indexes for firstname and lastname fields with COLLATE NOCASE
+to support case-insensitive search.
+"""
+from alembic import op
+import sqlite3
+import os
+
+# revision identifiers, used by Alembic.
+revision = 'c3d4e5f6g7h8'
+down_revision = 'b2c3d4e5f6g7'
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    """
+    Recreate SQLite indexes with COLLATE NOCASE for firstname and lastname fields.
+    This enables efficient case-insensitive searches on name fields.
+    """
+    # Get SQLite database path from environment or use default
+    sqlite_path = os.getenv('SQLITE_PATH', '/app/data/ssn_database.db')
+
+    # Check if SQLite database exists
+    if not os.path.exists(sqlite_path):
+        print(f"SQLite database not found at {sqlite_path}, skipping index recreation")
+        return
+
+    # Connect to SQLite database
+    conn = sqlite3.connect(sqlite_path)
+    cursor = conn.cursor()
+
+    try:
+        # Drop old indexes for ssn_1 table
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_1_name_zip")
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_1_name_state")
+
+        # Create new indexes with COLLATE NOCASE for ssn_1
+        cursor.execute("""
+            CREATE INDEX idx_ssn_1_name_zip
+            ON ssn_1(firstname COLLATE NOCASE, lastname COLLATE NOCASE, zip)
+        """)
+        cursor.execute("""
+            CREATE INDEX idx_ssn_1_name_state
+            ON ssn_1(firstname COLLATE NOCASE, lastname COLLATE NOCASE, state)
+        """)
+        cursor.execute("""
+            CREATE INDEX idx_ssn_1_name
+            ON ssn_1(firstname COLLATE NOCASE, lastname COLLATE NOCASE)
+        """)
+
+        # Drop old indexes for ssn_2 table
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_2_name_zip")
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_2_name_state")
+
+        # Create new indexes with COLLATE NOCASE for ssn_2
+        cursor.execute("""
+            CREATE INDEX idx_ssn_2_name_zip
+            ON ssn_2(firstname COLLATE NOCASE, lastname COLLATE NOCASE, zip)
+        """)
+        cursor.execute("""
+            CREATE INDEX idx_ssn_2_name_state
+            ON ssn_2(firstname COLLATE NOCASE, lastname COLLATE NOCASE, state)
+        """)
+        cursor.execute("""
+            CREATE INDEX idx_ssn_2_name
+            ON ssn_2(firstname COLLATE NOCASE, lastname COLLATE NOCASE)
+        """)
+
+        # Commit changes
+        conn.commit()
+        print("SQLite indexes recreated successfully with COLLATE NOCASE")
+
+    except sqlite3.Error as e:
+        print(f"Error recreating SQLite indexes: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def downgrade() -> None:
+    """
+    Revert to original indexes without COLLATE NOCASE.
+    This removes the case-insensitive search optimization.
+    """
+    # Get SQLite database path from environment or use default
+    sqlite_path = os.getenv('SQLITE_PATH', '/app/data/ssn_database.db')
+
+    # Check if SQLite database exists
+    if not os.path.exists(sqlite_path):
+        print(f"SQLite database not found at {sqlite_path}, skipping index rollback")
+        return
+
+    # Connect to SQLite database
+    conn = sqlite3.connect(sqlite_path)
+    cursor = conn.cursor()
+
+    try:
+        # Drop new indexes for ssn_1 table
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_1_name_zip")
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_1_name_state")
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_1_name")
+
+        # Recreate original indexes without COLLATE NOCASE for ssn_1
+        cursor.execute("""
+            CREATE INDEX idx_ssn_1_name_zip
+            ON ssn_1(firstname, lastname, zip)
+        """)
+        cursor.execute("""
+            CREATE INDEX idx_ssn_1_name_state
+            ON ssn_1(firstname, lastname, state)
+        """)
+
+        # Drop new indexes for ssn_2 table
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_2_name_zip")
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_2_name_state")
+        cursor.execute("DROP INDEX IF EXISTS idx_ssn_2_name")
+
+        # Recreate original indexes without COLLATE NOCASE for ssn_2
+        cursor.execute("""
+            CREATE INDEX idx_ssn_2_name_zip
+            ON ssn_2(firstname, lastname, zip)
+        """)
+        cursor.execute("""
+            CREATE INDEX idx_ssn_2_name_state
+            ON ssn_2(firstname, lastname, state)
+        """)
+
+        # Commit changes
+        conn.commit()
+        print("SQLite indexes rolled back to original version")
+
+    except sqlite3.Error as e:
+        print(f"Error rolling back SQLite indexes: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

@@ -1,0 +1,436 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { getOrders, getOrderDetails, type OrderSummary, type OrderDetailResponse } from '$lib/api/client';
+	import { formatCurrency, formatDate, maskSSN, getStatusBadgeClass, formatDOBISO } from '$lib/utils';
+	import { ORDER_STATUSES } from '$lib/constants/orderStatuses';
+
+	// Components
+	import {
+		Table,
+		TableBody,
+		TableCell,
+		TableHead,
+		TableHeader,
+		TableRow
+	} from '$lib/components/ui/table';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Alert, AlertDescription } from '$lib/components/ui/alert';
+	import * as Select from '$lib/components/ui/select';
+
+	// Icons (deep imports)
+	import Clock from '@lucide/svelte/icons/clock';
+	import CheckCircle from '@lucide/svelte/icons/check-circle';
+	import XCircle from '@lucide/svelte/icons/x-circle';
+	import Ban from '@lucide/svelte/icons/ban';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import ChevronUp from '@lucide/svelte/icons/chevron-up';
+	import Download from '@lucide/svelte/icons/download';
+	import Filter from '@lucide/svelte/icons/filter';
+	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
+	import Loader2 from '@lucide/svelte/icons/loader-2';
+
+	// State
+	let orders = $state<OrderSummary[]>([]);
+	let isLoading = $state(true);
+	let selectedStatus = $state<string>('all');
+	let currentPage = $state(0);
+	let pageSize = $state(10);
+	let expandedOrderId = $state<string | null>(null);
+	let orderDetails = $state<Map<string, OrderDetailResponse>>(new Map());
+	let loadingDetails = $state<Set<string>>(new Set());
+	let errorMessage = $state('');
+
+	// Derived values
+	let filteredOrders = $derived(
+		selectedStatus === 'all' ? orders : orders.filter((o) => o.status === selectedStatus)
+	);
+
+	let paginatedOrders = $derived(
+		filteredOrders.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+	);
+
+	let totalPages = $derived(Math.ceil(filteredOrders.length / pageSize));
+
+	// Lifecycle
+	onMount(async () => {
+		await loadOrders();
+	});
+
+	// Functions
+	async function loadOrders() {
+		try {
+			isLoading = true;
+			errorMessage = '';
+			const status = selectedStatus === 'all' ? undefined : selectedStatus;
+			orders = await getOrders(status, 100, 0);
+		} catch (error) {
+			console.error('Failed to load orders:', error);
+			errorMessage = 'Не удалось загрузить заказы';
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	async function handleRefresh() {
+		await loadOrders();
+	}
+
+	async function handleStatusFilter(value: string) {
+		selectedStatus = value;
+		currentPage = 0;
+		await loadOrders();
+	}
+
+	async function handleToggleExpand(order_id: string) {
+		if (expandedOrderId === order_id) {
+			expandedOrderId = null;
+			return;
+		}
+
+		expandedOrderId = order_id;
+
+		// Load order details if not cached
+		if (!orderDetails.has(order_id)) {
+			try {
+				loadingDetails.add(order_id);
+				loadingDetails = loadingDetails; // Trigger reactivity
+
+				const details = await getOrderDetails(order_id);
+				orderDetails.set(order_id, details);
+				orderDetails = orderDetails; // Trigger reactivity
+			} catch (error) {
+				console.error('Failed to load order details:', error);
+				errorMessage = 'Не удалось загрузить детали заказа';
+			} finally {
+				loadingDetails.delete(order_id);
+				loadingDetails = loadingDetails; // Trigger reactivity
+			}
+		}
+	}
+
+	function handleExport() {
+		try {
+			// Create CSV content
+			const headers = ['Order ID', 'Date', 'Items Count', 'Total', 'Status'];
+			const rows = filteredOrders.map((order) => [
+				order.id,
+				formatDate(order.created_at),
+				order.items_count.toString(),
+				order.total_price.toString(),
+				order.status
+			]);
+
+			const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
+
+			// Create blob and download
+			const blob = new Blob([csvContent], { type: 'text/csv' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `orders-${new Date().toISOString()}.csv`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('Failed to export orders:', error);
+			errorMessage = 'Не удалось экспортировать заказы';
+		}
+	}
+
+	function handleExportTxt() {
+		try {
+			// Create TXT content
+			let txtContent = 'ЗАКАЗЫ\n\n';
+			txtContent += '='.repeat(80) + '\n\n';
+
+			filteredOrders.forEach((order, index) => {
+				txtContent += `Заказ ${index + 1}\n`;
+				txtContent += '-'.repeat(80) + '\n';
+				txtContent += `Order ID: ${order.id}\n`;
+				txtContent += `Дата: ${formatDate(order.created_at)}\n`;
+				txtContent += `Количество товаров: ${order.items_count}\n`;
+				txtContent += `Сумма: ${formatCurrency(order.total_price)}\n`;
+				txtContent += `Статус: ${ORDER_STATUSES.find((s) => s.value === order.status)?.label || order.status}\n`;
+				txtContent += '\n';
+			});
+
+			// Create blob and download
+			const blob = new Blob([txtContent], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `orders-${new Date().toISOString()}.txt`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('Failed to export orders:', error);
+			errorMessage = 'Не удалось экспортировать заказы';
+		}
+	}
+
+	function goToPage(page: number) {
+		if (page >= 0 && page < totalPages) {
+			currentPage = page;
+		}
+	}
+
+	function getStatusIcon(status: string) {
+		switch (status.toLowerCase()) {
+			case 'pending':
+				return Clock;
+			case 'completed':
+				return CheckCircle;
+			case 'failed':
+				return XCircle;
+			case 'cancelled':
+				return Ban;
+			default:
+				return null;
+		}
+	}
+</script>
+
+<div class="container mx-auto max-w-7xl space-y-6 p-6">
+	<!-- Page Title -->
+	<div class="flex items-center justify-between">
+		<h1 class="text-3xl font-bold">Заказы</h1>
+	</div>
+
+	<!-- Filters and Actions Bar -->
+	<div class="flex flex-wrap items-center gap-4">
+		<!-- Status Filter -->
+		<Select.Root
+			onSelectedChange={(selected) => {
+				if (selected) {
+					handleStatusFilter(selected.value);
+				}
+			}}
+		>
+			<Select.Trigger class="w-[180px]">
+				<Filter class="mr-2 h-4 w-4" />
+				<Select.Value placeholder="Фильтр статуса" />
+			</Select.Trigger>
+			<Select.Content>
+				{#each ORDER_STATUSES as status}
+					<Select.Item value={status.value}>{status.label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+
+		<!-- Refresh Button -->
+		<Button variant="outline" onclick={handleRefresh} disabled={isLoading}>
+			<RefreshCw class={`mr-2 h-4 w-4${isLoading ? ' animate-spin' : ''}`} />
+			Обновить
+		</Button>
+
+		<!-- Export Button -->
+		<Button variant="outline" onclick={handleExport} disabled={orders.length === 0}>
+			<Download class="mr-2 h-4 w-4" />
+			Экспорт CSV
+		</Button>
+
+		<!-- Export TXT Button -->
+		<Button variant="outline" onclick={handleExportTxt} disabled={orders.length === 0}>
+			<Download class="mr-2 h-4 w-4" />
+			Экспорт TXT
+		</Button>
+	</div>
+
+	<!-- Error Alert -->
+	{#if errorMessage}
+		<Alert variant="destructive">
+			<AlertDescription>{errorMessage}</AlertDescription>
+		</Alert>
+	{/if}
+
+	<!-- Loading State -->
+	{#if isLoading}
+		<div class="space-y-2">
+			{#each Array(10) as _}
+				<Skeleton class="h-16 w-full" />
+			{/each}
+		</div>
+	{:else if orders.length === 0}
+		<!-- Empty State -->
+		<Card>
+			<CardContent class="flex flex-col items-center justify-center py-12">
+				<ShoppingBag class="mb-4 h-16 w-16 text-gray-400" />
+				<h2 class="mb-2 text-xl font-semibold">У вас пока нет заказов</h2>
+				<p class="mb-4 text-gray-500">Начните покупки, чтобы увидеть заказы здесь</p>
+			</CardContent>
+		</Card>
+	{:else}
+		<!-- Orders Table -->
+		<Card>
+			<CardContent class="p-0">
+				<div class="overflow-x-auto">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead class="w-[100px]">ID заказа</TableHead>
+								<TableHead>Дата</TableHead>
+								<TableHead>Товары</TableHead>
+								<TableHead class="text-right">Сумма</TableHead>
+								<TableHead>Статус</TableHead>
+								<TableHead class="w-[80px]"></TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{#each paginatedOrders as order (order.id)}
+								<TableRow>
+									<TableCell class="font-mono text-sm">
+										{order.id.slice(0, 8)}...
+									</TableCell>
+									<TableCell class="text-sm">
+										{formatDate(order.created_at)}
+									</TableCell>
+									<TableCell class="text-sm">{order.items_count} товаров</TableCell>
+									<TableCell class="text-right font-semibold">
+										{formatCurrency(order.total_price)}
+									</TableCell>
+									<TableCell>
+										{#if getStatusIcon(order.status)}
+											{@const Icon = getStatusIcon(order.status)}
+											<Badge class={getStatusBadgeClass(order.status)}>
+												<Icon class="mr-1 h-3 w-3" />
+												{ORDER_STATUSES.find((s) => s.value === order.status)?.label || order.status}
+											</Badge>
+										{:else}
+											<Badge class={getStatusBadgeClass(order.status)}>
+												{ORDER_STATUSES.find((s) => s.value === order.status)?.label || order.status}
+											</Badge>
+										{/if}
+									</TableCell>
+									<TableCell>
+										<Button
+											variant="ghost"
+											size="icon"
+											onclick={() => handleToggleExpand(order.id)}
+										>
+											{#if expandedOrderId === order.id}
+												<ChevronUp class="h-4 w-4" />
+											{:else}
+												<ChevronDown class="h-4 w-4" />
+											{/if}
+										</Button>
+									</TableCell>
+								</TableRow>
+
+								<!-- Expandable Details Row -->
+								{#if expandedOrderId === order.id}
+									<TableRow>
+										<TableCell colspan={6} class="p-0">
+											<div class="border-t bg-gray-50 p-6">
+													{#if loadingDetails.has(order.id)}
+														<div class="flex items-center justify-center py-8">
+															<Loader2 class="h-8 w-8 animate-spin text-gray-400" />
+														</div>
+													{:else if orderDetails.has(order.id)}
+														{@const details = orderDetails.get(order.id)}
+														{#if details}
+															<Card>
+																<CardHeader>
+																	<CardTitle class="text-lg">Детали заказа</CardTitle>
+																</CardHeader>
+																<CardContent>
+																	<div class="overflow-x-auto">
+																		<Table>
+																			<TableHeader>
+																				<TableRow>
+																					<TableHead>Имя</TableHead>
+																					<TableHead>SSN</TableHead>
+																					<TableHead>DOB</TableHead>
+																					<TableHead>Email</TableHead>
+																					<TableHead>Телефон</TableHead>
+																					<TableHead>Город</TableHead>
+																					<TableHead>Штат</TableHead>
+																					<TableHead class="text-right">Цена</TableHead>
+																				</TableRow>
+																			</TableHeader>
+																			<TableBody>
+																				{#each details.items as item}
+																					<TableRow>
+																						<TableCell class="font-medium">
+																							{item.ssn_details?.firstname || '-'} {item.ssn_details
+																								?.lastname || '-'}
+																						</TableCell>
+																						<TableCell>
+																							<code class="rounded bg-gray-100 px-2 py-1 text-xs">
+																								{item.ssn}
+																							</code>
+																						</TableCell>
+																						<TableCell class="text-sm text-gray-600">
+																							{item.ssn_details?.dob ? formatDOBISO(item.ssn_details.dob) : '-'}
+													</TableCell>
+													<TableCell class="text-sm text-gray-600">
+														{item.ssn_details?.email || '-'}
+																						</TableCell>
+																						<TableCell class="text-sm text-gray-600">
+																							{item.ssn_details?.phone || '-'}
+																						</TableCell>
+																						<TableCell class="text-sm text-gray-600">
+																							{item.ssn_details?.city || '-'}
+																						</TableCell>
+																						<TableCell class="text-sm text-gray-600">
+																							{item.ssn_details?.state || '-'}
+																						</TableCell>
+																						<TableCell class="text-right font-medium">
+																							{formatCurrency(Number(item.price))}
+																						</TableCell>
+																					</TableRow>
+																				{/each}
+																				<TableRow>
+																					<TableCell colspan={6} class="text-right font-bold">
+																						Итого:
+																					</TableCell>
+																					<TableCell class="text-right font-bold">
+																						{formatCurrency(details.total_price)}
+																					</TableCell>
+																				</TableRow>
+																			</TableBody>
+																		</Table>
+																	</div>
+																</CardContent>
+															</Card>
+														{/if}
+													{/if}
+											</div>
+										</TableCell>
+									</TableRow>
+								{/if}
+							{/each}
+						</TableBody>
+					</Table>
+				</div>
+			</CardContent>
+		</Card>
+
+		<!-- Pagination -->
+		{#if totalPages > 1}
+			<div class="flex items-center justify-between">
+				<div class="text-sm text-gray-600">
+					Страница {currentPage + 1} из {totalPages}
+				</div>
+				<div class="flex gap-2">
+					<Button variant="outline" onclick={() => goToPage(currentPage - 1)} disabled={currentPage === 0}>
+						Назад
+					</Button>
+					<Button
+						variant="outline"
+						onclick={() => goToPage(currentPage + 1)}
+						disabled={currentPage >= totalPages - 1}
+					>
+						Вперед
+					</Button>
+				</div>
+			</div>
+		{/if}
+	{/if}
+</div>
