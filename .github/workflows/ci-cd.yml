@@ -214,6 +214,8 @@ jobs:
           CRYPTOCURRENCYAPI_KEY=${{ secrets.CRYPTOCURRENCYAPI_KEY }}
           IPN_WEBHOOK_URL=https://data-leaks.cc/api/public/billing/ipn/cryptocurrencyapi
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ALERT_BOT_TOKEN=${{ secrets.TELEGRAM_ALERT_BOT_TOKEN }}
+          TELEGRAM_ALERT_CHANNEL_ID=${{ secrets.TELEGRAM_ALERT_CHANNEL_ID }}
           BOT_API_KEY=${{ secrets.BOT_API_KEY }}
           PUBLIC_API_URL=http://public_api:8000
           WS_RECONNECT_DELAY=5
@@ -230,6 +232,7 @@ jobs:
           UVICORN_WORKERS=4
           UVICORN_WORKERS_ADMIN=2
           LOG_LEVEL=INFO
+          LOG_JSON_ENABLED=true
           EOF
           sed -i 's/^[[:space:]]*//' .env
 
