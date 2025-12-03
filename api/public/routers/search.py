@@ -19,6 +19,8 @@ from api.common.models_sqlite import (
 from api.public.dependencies import get_current_user, limiter
 from api.common.models_postgres import User, Order, OrderStatus, OrderType, InstantSSNSearch, InstantSSNAbuseTracking
 from api.common.searchbug_client import create_searchbug_client, SearchbugAPIError
+from api.common.validators import validate_ssn
+from api.common.sanitizers import sanitize_name, sanitize_address, sanitize_metadata
 from sqlalchemy import select, desc
 from api.common.pricing import INSTANT_SSN_PRICE, MANUAL_SSN_PRICE, REVERSE_SSN_PRICE, SEARCHBUG_API_COST, check_maintenance_mode, get_user_price
 from uuid import UUID
@@ -426,33 +428,39 @@ async def search_by_name(
     """
     search_engine = SearchEngine(db_path=SQLITE_PATH)
 
+    # Sanitize input values for safety
+    firstname_s = sanitize_name(request.firstname) or request.firstname
+    lastname_s = sanitize_name(request.lastname) or request.lastname
+    zip_s = request.zip.strip() if request.zip else None
+    address_s = sanitize_address(request.address) if request.address else None
+
     # Determine search type and perform search
-    if request.zip:
+    if zip_s:
         # Search by name + zip
         results_json = search_engine.search_by_name_zip(
-            request.firstname,
-            request.lastname,
-            request.zip,
+            firstname_s,
+            lastname_s,
+            zip_s,
             limit=request.limit
         )
-        search_params = {
-            'firstname': request.firstname,
-            'lastname': request.lastname,
-            'zip': request.zip
-        }
-    elif request.address:
+        search_params = sanitize_metadata({
+            'firstname': firstname_s,
+            'lastname': lastname_s,
+            'zip': zip_s
+        }) or {}
+    elif address_s:
         # Search by name + address
         results_json = search_engine.search_by_name_address(
-            request.firstname,
-            request.lastname,
-            request.address,
+            firstname_s,
+            lastname_s,
+            address_s,
             limit=request.limit
         )
-        search_params = {
-            'firstname': request.firstname,
-            'lastname': request.lastname,
-            'address': request.address
-        }
+        search_params = sanitize_metadata({
+            'firstname': firstname_s,
+            'lastname': lastname_s,
+            'address': address_s
+        }) or {}
     else:
         # Neither zip nor address provided
         raise HTTPException(
@@ -508,8 +516,17 @@ async def get_record(
         SSN record (with email/phone hidden, only counts shown)
 
     Raises:
-        HTTPException: If record not found
+        HTTPException: If record not found or SSN format is invalid
     """
+    # Validate SSN format before database query
+    is_valid, error = validate_ssn(ssn)
+    if not is_valid:
+        logger.warning(f"Invalid SSN format rejected in get_record: {ssn[:20] if len(ssn) > 20 else ssn}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error
+        )
+
     data_manager = DataManager(db_path=SQLITE_PATH)
 
     # Search in both tables
@@ -604,14 +621,17 @@ async def instant_ssn_search(
     else:
         source = RequestSource.other
 
+    # Sanitize search params for logging
+    sanitized_search_params = sanitize_metadata({
+        "firstname": request.firstname,
+        "lastname": request.lastname,
+        "address": request.address
+    }, max_depth=3, max_size=5000) or {}
+
     # Create initial search log entry
     search_log = InstantSSNSearch(
         user_id=current_user.id,
-        search_params={
-            "firstname": request.firstname,
-            "lastname": request.lastname,
-            "address": request.address
-        },
+        search_params=sanitized_search_params,
         success=False,
         ssn_found=False,
         api_cost=SEARCHBUG_API_COST,

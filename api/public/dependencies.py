@@ -175,6 +175,7 @@ def get_user_id_for_rate_limit(request: Request) -> str:
 
 # Create Limiter instance for rate limiting
 # Use Redis storage if REDIS_URL is configured, otherwise fallback to in-memory
+# Note: Rate limit exceeded events are logged via custom_rate_limit_handler in main.py
 redis_url = os.getenv('REDIS_URL')
 if redis_url:
     # Import redis storage only if needed

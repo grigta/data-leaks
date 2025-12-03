@@ -18,6 +18,7 @@ from api.common.models_postgres import User, Transaction, TransactionStatus, Pay
 from api.common.cryptocurrencyapi_client import get_cryptocurrencyapi_client, CryptoCurrencyAPIError
 from api.common.helket_client import get_helket_client, HelketError
 from api.common.ffio_client import get_ffio_client, FFIOError, get_ffio_currency_code
+from api.common.validators import validate_coupon_code
 from api.public.dependencies import get_current_user, limiter
 import asyncio
 from fastapi import BackgroundTasks
@@ -243,6 +244,15 @@ async def apply_coupon(
         # Normalize coupon code: strip whitespace and convert to uppercase
         normalized_code = coupon_request.code.strip().upper()
 
+        # Validate coupon code format before database query
+        is_valid, error = validate_coupon_code(normalized_code)
+        if not is_valid:
+            logger.warning(f"Invalid coupon code format rejected in apply_coupon: {normalized_code[:20]}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error
+            )
+
         # Query coupon by code (direct comparison with normalized code)
         result = await db.execute(
             select(Coupon).where(Coupon.code == normalized_code)
@@ -333,6 +343,15 @@ async def apply_coupon_to_balance(
     try:
         # Normalize coupon code: strip whitespace and convert to uppercase
         normalized_code = coupon_request.code.strip().upper()
+
+        # Validate coupon code format before database query
+        is_valid, error = validate_coupon_code(normalized_code)
+        if not is_valid:
+            logger.warning(f"Invalid coupon code format rejected in apply_coupon_to_balance: {normalized_code[:20]}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error
+            )
 
         # Query coupon by code (direct comparison with normalized code)
         result = await db.execute(
@@ -568,6 +587,15 @@ async def create_deposit(
         if deposit_request.coupon_code:
             # Normalize coupon code: strip whitespace and convert to uppercase
             normalized_coupon_code = deposit_request.coupon_code.strip().upper()
+
+            # Validate coupon code format before database query
+            is_valid, error = validate_coupon_code(normalized_coupon_code)
+            if not is_valid:
+                logger.warning(f"Invalid coupon code format rejected in create_deposit: {normalized_coupon_code[:20]}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error
+                )
 
             # Query coupon by code (direct comparison with normalized code)
             coupon_result = await db.execute(

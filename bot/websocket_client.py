@@ -15,9 +15,12 @@ from config import BotConfig
 from db_operations import get_db_session, get_user_telegram_chats, get_message_reference
 from utils.formatters import format_order_header, format_manual_ticket_completed
 from bot.config.pricing import MANUAL_SSN_PRICE
+from api.common.security_logger import SecurityEventLogger
 
 
 logger = logging.getLogger(__name__)
+# Security logger for WebSocket failure alerts
+_ws_security_logger = SecurityEventLogger("telegram_bot")
 
 
 class WebSocketClient:
@@ -38,6 +41,10 @@ class WebSocketClient:
         self.is_running: bool = False
         self.logger = logging.getLogger(f"{__name__}.WebSocketClient")
 
+        # Track consecutive connection failures for alerting
+        self._consecutive_failures: int = 0
+        self._failure_alert_threshold: int = 5  # Alert after 5 consecutive failures
+
     async def start(self) -> None:
         """Start WebSocket client with automatic reconnection."""
         self.is_running = True
@@ -51,10 +58,29 @@ class WebSocketClient:
             try:
                 await self._connect_and_listen()
                 # If we get here, connection closed gracefully
-                # Reset reconnect delay
+                # Reset reconnect delay and failure counter
                 self.reconnect_delay = self.config.ws_reconnect_delay
+                self._consecutive_failures = 0
             except Exception as e:
                 self.logger.error(f"WebSocket error: {e}", exc_info=True)
+
+                # Track consecutive failures
+                self._consecutive_failures += 1
+
+                # Send alert if threshold exceeded
+                if self._consecutive_failures >= self._failure_alert_threshold:
+                    try:
+                        await _ws_security_logger.log_server_error(
+                            path="telegram_bot_websocket",
+                            error_type=type(e).__name__,
+                            client_ip="bot",
+                            extra={
+                                "consecutive_failures": self._consecutive_failures,
+                                "error_message": str(e)[:200]
+                            }
+                        )
+                    except Exception as alert_err:
+                        self.logger.warning(f"Failed to send WebSocket failure alert: {alert_err}")
 
                 if self.is_running:
                     # Add jitter to reconnect delay (±20%)

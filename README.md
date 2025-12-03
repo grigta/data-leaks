@@ -264,12 +264,92 @@ docker stats
 
 ## Безопасность
 
-- Всегда используйте сильные пароли в production
-- Сгенерируйте уникальные значения для `JWT_SECRET`, `BOT_API_KEY`, `WEBHOOK_SECRET`
+Проект реализует многоуровневую защиту по принципу defense-in-depth.
+
+### SQL Injection Protection
+
+- Все SQL запросы используют параметризованные выражения
+- Параметр LIMIT также параметризован для предотвращения инъекций
+- Валидация входных данных перед выполнением запросов
+
+### Input Validation
+
+Централизованная валидация в `api/common/validators.py`:
+
+| Валидатор | Назначение | Макс. длина |
+|-----------|------------|-------------|
+| `validate_ssn()` | SSN формат | 11 символов |
+| `validate_name()` | Имена | 100 символов |
+| `validate_email()` | Email формат | 254 символа |
+| `validate_address()` | Адреса | 500 символов |
+| `validate_limit()` | LIMIT параметр | 1-1000 |
+
+### Data Sanitization
+
+Централизованная санитизация в `api/common/sanitizers.py`:
+
+- Удаление управляющих символов
+- Нормализация пробелов
+- Экранирование HTML
+- Ограничение глубины JSON метаданных
+
+### Рекомендации по безопасности
+
+- Используйте сильные пароли (минимум 16 символов)
+- Сгенерируйте уникальные значения для `JWT_SECRET`, `BOT_API_KEY`, `WEBHOOK_SECRET`:
+  ```bash
+  python -c 'import secrets; print(secrets.token_hex(32))'
+  ```
 - Ограничьте `ALLOWED_ORIGINS` только доверенными доменами
 - Никогда не коммитьте `.env` файл в git
 - Используйте HTTPS в production через Nginx
 - Регулярно обновляйте зависимости
+- Ротируйте секреты каждые 90 дней
+
+### Security Testing
+
+```bash
+# Запуск тестов безопасности
+docker-compose exec public_api python -m pytest tests/test_sql_injection.py -v
+```
+
+Подробная документация по безопасности: [docs/SECURITY.md](docs/SECURITY.md)
+
+## Документация
+
+- [Security Guide](docs/SECURITY.md) - Рекомендации по безопасности и best practices
+- [Logging System](docs/LOGGING.md) - Структурированное логирование, correlation IDs, мониторинг security events
+- [Cloudflare Setup](docs/CLOUDFLARE_SETUP.md) - Настройка интеграции с Cloudflare CDN, получение реального IP клиента
+
+## Особенности системы логирования
+
+Проект использует централизованную систему логирования:
+
+- **JSON-формат** - Структурированные логи для парсинга в ELK/Loki
+- **Correlation IDs** - Отслеживание запросов через X-Request-ID
+- **Security Events** - Логирование failed logins, rate limits, suspicious activity
+- **Performance Metrics** - Трекинг времени ответа и медленных запросов
+- **Docker Log Rotation** - Автоматическая ротация логов (10MB, 5 файлов)
+
+Подробная документация: [docs/LOGGING.md](docs/LOGGING.md)
+
+### Telegram Alerting
+
+Критические события автоматически отправляются в Telegram канал:
+
+| Severity | События |
+|----------|---------|
+| 🚨 Critical | DB failures, high error rate (>10%) |
+| ⚠️ Warning | Multiple 500 errors (>5/min), rate limit abuse (>100) |
+| ℹ️ Info | Service startup/shutdown |
+
+Настройка:
+```bash
+TELEGRAM_ALERT_BOT_TOKEN=your_bot_token
+TELEGRAM_ALERT_CHANNEL_ID=-1001234567890
+```
+
+Подробности: [docs/LOGGING.md#telegram-alerting](docs/LOGGING.md#telegram-alerting)
 
 ## Лицензия
 

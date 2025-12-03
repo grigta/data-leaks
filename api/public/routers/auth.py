@@ -1,6 +1,7 @@
 """
 Authentication router for Public API.
 """
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,10 +16,17 @@ from api.common.auth import (
 )
 from api.common.models_postgres import User, Coupon, UserCoupon, CouponType
 from api.public.dependencies import get_current_user
+from api.common.validators import (
+    validate_email, validate_telegram, validate_jabber,
+    validate_coupon_code, validate_string_length
+)
+from api.common.sanitizers import sanitize_email, sanitize_string
+from api.common.security_logger import SecurityEventLogger
 from pydantic import BaseModel
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+security_logger = SecurityEventLogger("public_api.auth")
 router = APIRouter()
 
 
@@ -116,6 +124,15 @@ async def validate_coupon(
     try:
         # Normalize coupon code
         normalized_code = request.coupon_code.strip().upper()
+
+        # Validate coupon code format before database query
+        is_valid, error = validate_coupon_code(normalized_code)
+        if not is_valid:
+            logger.warning(f"Invalid coupon code format rejected: {normalized_code[:20]}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error
+            )
 
         # Query coupon by code
         result = await db.execute(
@@ -253,9 +270,6 @@ async def register(
     Raises:
         HTTPException: If access code generation fails or coupon/invitation validation fails
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
     # Check if registration requires a coupon using requires_registration field
     if not coupon_code:
         # Check if any active coupon with requires_registration=True exists
@@ -272,6 +286,11 @@ async def register(
 
         if required_coupon:
             # At least one active registration-required coupon exists, so registration without code is not allowed
+            security_logger.log_suspicious_activity(
+                ip="unknown",  # IP is logged by middleware
+                activity_type="registration_without_required_coupon",
+                details={}
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Registration requires a valid registration coupon code"
@@ -321,6 +340,23 @@ async def register(
         # Normalize invitation code
         normalized_invitation = invitation_code.strip().upper()
 
+        # Validate invitation code format (only A-Z0-9, max 20 chars)
+        is_valid, error = validate_string_length(normalized_invitation, 1, 20, "invitation_code")
+        if not is_valid:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error
+            )
+
+        if not re.match(r'^[A-Z0-9]+$', normalized_invitation):
+            logger.warning(f"Invalid invitation code format rejected: {normalized_invitation[:20]}")
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invitation code must contain only letters and digits"
+            )
+
         # Query inviter by invitation_code
         inviter_result = await db.execute(
             select(User).where(User.invitation_code == normalized_invitation)
@@ -363,6 +399,16 @@ async def register(
     if coupon_code:
         # Normalize coupon code
         normalized_code = coupon_code.strip().upper()
+
+        # Validate coupon code format before database query
+        is_valid, error = validate_coupon_code(normalized_code)
+        if not is_valid:
+            logger.warning(f"Invalid coupon code format rejected in register: {normalized_code[:20]}")
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error
+            )
 
         # Query coupon by code
         coupon_result = await db.execute(
@@ -442,6 +488,16 @@ async def register(
     await db.commit()
     await db.refresh(new_user)
 
+    # Log successful registration
+    logger.info(
+        f"New user registered: {new_user.username}",
+        extra={
+            "user_id": str(new_user.id),
+            "has_coupon": bool(coupon_code),
+            "has_invitation": bool(invitation_code)
+        }
+    )
+
     return UserResponse(
         id=str(new_user.id),
         username=new_user.username,
@@ -472,16 +528,20 @@ async def login(
     Raises:
         HTTPException: If access code is invalid
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"Login attempt with access_code: {login_data.access_code} (len={len(login_data.access_code)})")
+    # Mask access code for logging (show only first 8 chars)
+    masked_code = login_data.access_code[:8] + "..." if len(login_data.access_code) > 8 else "****"
+    logger.info(f"Login attempt with access_code: {masked_code}")
 
     # Find user by access code
     result = await db.execute(select(User).where(User.access_code == login_data.access_code))
     user = result.scalar_one_or_none()
 
     if not user:
-        logger.warning(f"Login failed: access_code not found: {login_data.access_code}")
+        security_logger.log_failed_login(
+            username=masked_code,
+            ip="unknown",  # IP is logged by middleware
+            reason="access_code_not_found"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid access code",
@@ -491,6 +551,12 @@ async def login(
     # Create JWT token
     access_token = create_access_token(
         data={"sub": user.username, "user_id": str(user.id)}
+    )
+
+    # Log successful login
+    logger.info(
+        f"Successful login for user {user.username}",
+        extra={"user_id": str(user.id)}
     )
 
     return Token(access_token=access_token, token_type="bearer")
@@ -548,24 +614,66 @@ async def update_profile(
         Updated user profile data
 
     Raises:
-        HTTPException: If email is already taken
+        HTTPException: If email is already taken or validation fails
     """
-    # Update fields if provided
+    # Update fields if provided with validation and sanitization
     if telegram is not None:
-        current_user.telegram = telegram
+        if telegram.strip():  # Non-empty telegram
+            is_valid, error = validate_telegram(telegram)
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error
+                )
+            # Sanitize and store
+            current_user.telegram = sanitize_string(telegram.strip(), max_length=32)
+        else:
+            # Allow clearing the field
+            current_user.telegram = None
+
     if jabber is not None:
-        current_user.jabber = jabber
+        if jabber.strip():  # Non-empty jabber
+            is_valid, error = validate_jabber(jabber)
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error
+                )
+            # Sanitize and store
+            current_user.jabber = sanitize_string(jabber.strip().lower(), max_length=254)
+        else:
+            # Allow clearing the field
+            current_user.jabber = None
+
     if email is not None:
-        # Check if email is already taken by another user
-        result = await db.execute(
-            select(User).where(User.email == email, User.id != current_user.id)
-        )
-        if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+        if email.strip():  # Non-empty email
+            # Validate email format
+            is_valid, error = validate_email(email)
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=error
+                )
+            # Sanitize email
+            sanitized_email = sanitize_email(email)
+            # Check if email is already taken by another user
+            result = await db.execute(
+                select(User).where(User.email == sanitized_email, User.id != current_user.id)
             )
-        current_user.email = email
+            if result.scalar_one_or_none():
+                security_logger.log_suspicious_activity(
+                    ip="unknown",  # IP is logged by middleware
+                    activity_type="duplicate_email_attempt",
+                    details={"email_domain": sanitized_email.split("@")[1] if "@" in sanitized_email else "unknown"}
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered"
+                )
+            current_user.email = sanitized_email
+        else:
+            # Allow clearing the field
+            current_user.email = None
 
     await db.commit()
     await db.refresh(current_user)

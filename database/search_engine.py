@@ -9,6 +9,20 @@ from database.normalizers import (
     normalize_name,
     get_name_variants
 )
+from api.common.validators import (
+    validate_limit,
+    validate_ssn,
+    validate_name,
+    validate_address,
+    validate_zip,
+    safe_int,
+    MAX_LIMIT_VALUE
+)
+from api.common.sanitizers import (
+    sanitize_name,
+    sanitize_address,
+    sanitize_string
+)
 
 
 class SearchEngine:
@@ -32,6 +46,37 @@ class SearchEngine:
         """
         self.db_path = db_path if db_path is not None else DEFAULT_DB_PATH
         self.logger = logging.getLogger(self.__class__.__name__)
+
+    def _safe_limit(self, limit) -> tuple:
+        """
+        Safely validate and process LIMIT parameter.
+
+        Security:
+            - Validates limit is a positive integer
+            - Enforces maximum limit (1000)
+            - Returns empty tuple for None (no limit)
+            - Logs invalid limit attempts
+
+        Args:
+            limit: Limit value to validate (int, str, or None)
+
+        Returns:
+            Tuple: (limit_clause_str, limit_params_tuple)
+            - For valid limit: (" LIMIT ?", (safe_limit,))
+            - For None: ("", ())
+        """
+        if limit is None:
+            return "", ()
+
+        # Validate limit using centralized validator
+        is_valid, error = validate_limit(limit, max_limit=MAX_LIMIT_VALUE)
+        if not is_valid:
+            self.logger.warning(f"Invalid LIMIT value rejected: {limit} - {error}")
+            # Return default limit for safety
+            return " LIMIT ?", (100,)
+
+        safe_limit = safe_int(limit, default=100, max_value=MAX_LIMIT_VALUE)
+        return " LIMIT ?", (safe_limit,)
 
     def _mask_ssn(self, ssn):
         """
@@ -66,13 +111,18 @@ class SearchEngine:
             return f"{local[0]}***@{domain}"
         return f"***@{domain}"
 
-    def _execute_search(self, query, params):
+    def _execute_search(self, query, params, limit_params=()):
         """
         Execute a SQL search query with parameters.
+
+        Security:
+            - Uses parameterized queries for all user input
+            - LIMIT is passed as separate parameter tuple for safety
 
         Args:
             query: SQL query string with placeholders
             params: Tuple of parameters for the query
+            limit_params: Tuple of LIMIT parameter(s) to append
 
         Returns:
             list: List of dictionaries containing search results
@@ -85,7 +135,10 @@ class SearchEngine:
         try:
             connection = get_connection(self.db_path)
             cursor = connection.cursor()
-            cursor.execute(query, params)
+
+            # Combine params with limit_params for full parameterization
+            all_params = params + limit_params
+            cursor.execute(query, all_params)
             results = cursor.fetchall()
 
             # Convert sqlite3.Row objects to dictionaries
@@ -125,6 +178,10 @@ class SearchEngine:
         """
         Search for records by last 4 digits of SSN.
 
+        Security:
+            - Uses parameterized queries for all user input
+            - LIMIT is validated and parameterized
+
         Args:
             last4: Last 4 digits of SSN
             limit: Optional maximum number of results to return
@@ -132,10 +189,18 @@ class SearchEngine:
         Returns:
             list: List of matching records
         """
+        # Validate last4 (should be exactly 4 digits)
+        if not last4 or not str(last4).isdigit() or len(str(last4)) != 4:
+            self.logger.warning(f"Invalid last4 SSN format: {last4}")
+            return []
+
         # SSN pattern: ___-__-XXXX
         ssn_pattern = f"%-{last4}"
 
-        query = """
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
+        query = f"""
         SELECT * FROM (
             SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_1' as source_table
             FROM ssn_1 WHERE ssn LIKE ?
@@ -148,18 +213,17 @@ class SearchEngine:
         ){limit_clause}
         """
 
-        # Add LIMIT clause if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
-
         self.logger.info(f"Searching by last 4 digits of SSN: ***-**-{last4}")
-        return self._execute_search(query, (ssn_pattern, ssn_pattern, ssn_pattern))
+        return self._execute_search(query, (ssn_pattern, ssn_pattern, ssn_pattern), limit_params)
 
     def search_by_ssn(self, ssn, limit=None):
         """
         Search for records by Social Security Number.
+
+        Security:
+            - Validates SSN format before search
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Supports three formats:
         1. XXX-XX-XXXX (formatted with dashes)
@@ -173,6 +237,12 @@ class SearchEngine:
         Returns:
             str: JSON string with matching records
         """
+        # Validate SSN using centralized validator
+        is_valid, error = validate_ssn(str(ssn))
+        if not is_valid:
+            self.logger.warning(f"SSN validation failed: {error}")
+            return self._format_results_to_json([])
+
         # Normalize SSN: remove spaces and dashes, keep only digits
         normalized_ssn = ''.join(c for c in str(ssn) if c.isdigit())
 
@@ -190,7 +260,10 @@ class SearchEngine:
         # Format SSN as XXX-XX-XXXX for database search
         formatted_ssn = f"{normalized_ssn[:3]}-{normalized_ssn[3:5]}-{normalized_ssn[5:]}"
 
-        query = """
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
+        query = f"""
         SELECT * FROM (
             SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_1' as source_table
             FROM ssn_1 WHERE ssn = ?
@@ -203,20 +276,20 @@ class SearchEngine:
         ){limit_clause}
         """
 
-        # Add LIMIT clause if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
-
         self.logger.info(f"Searching by full SSN: {self._mask_ssn(formatted_ssn)}")
-        results = self._execute_search(query, (formatted_ssn, formatted_ssn, formatted_ssn))
+        results = self._execute_search(query, (formatted_ssn, formatted_ssn, formatted_ssn), limit_params)
 
         return self._format_results_to_json(results)
 
     def search_by_name_zip(self, firstname, lastname, zip_code, limit=None):
         """
         Search for records by first name, last name, and ZIP code.
+
+        Security:
+            - Validates all input parameters
+            - Sanitizes names before search
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Uses the composite index idx_{table}_name_zip for optimized performance.
 
@@ -229,17 +302,31 @@ class SearchEngine:
         Returns:
             str: JSON string with matching records
         """
-        # Normalize input data
-        firstname = str(firstname).strip()
-        lastname = str(lastname).strip()
-        zip_code = str(zip_code).strip()
+        # Sanitize input data
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+        zip_code = sanitize_string(str(zip_code).strip(), max_length=10) or ""
 
         # Validate required fields
         if not firstname or not lastname:
             self.logger.warning("Firstname and lastname are required for name+zip search")
             return self._format_results_to_json([])
 
-        query = """
+        # Validate names
+        is_valid, error = validate_name(firstname, "firstname")
+        if not is_valid:
+            self.logger.warning(f"Invalid firstname: {error}")
+            return self._format_results_to_json([])
+
+        is_valid, error = validate_name(lastname, "lastname")
+        if not is_valid:
+            self.logger.warning(f"Invalid lastname: {error}")
+            return self._format_results_to_json([])
+
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
+        query = f"""
         SELECT * FROM (
             SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_1' as source_table
             FROM ssn_1 WHERE firstname = ? COLLATE NOCASE AND lastname = ? COLLATE NOCASE AND zip = ?
@@ -252,20 +339,24 @@ class SearchEngine:
         ){limit_clause}
         """
 
-        # Add LIMIT clause if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
-
         self.logger.info("Searching by name+zip")
-        results = self._execute_search(query, (firstname, lastname, zip_code, firstname, lastname, zip_code, firstname, lastname, zip_code))
+        results = self._execute_search(
+            query,
+            (firstname, lastname, zip_code, firstname, lastname, zip_code, firstname, lastname, zip_code),
+            limit_params
+        )
 
         return self._format_results_to_json(results)
 
     def search_by_name_address(self, firstname, lastname, address, limit=None):
         """
         Search for records by first name, last name, and address.
+
+        Security:
+            - Validates all input parameters
+            - Sanitizes names and address before search
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Uses the composite index idx_{table}_name_address for optimized performance.
 
@@ -278,17 +369,31 @@ class SearchEngine:
         Returns:
             str: JSON string with matching records
         """
-        # Normalize input data
-        firstname = str(firstname).strip()
-        lastname = str(lastname).strip()
-        address = str(address).strip()
+        # Sanitize input data
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+        address = sanitize_address(str(address).strip()) or ""
 
         # Validate required fields
         if not firstname or not lastname:
             self.logger.warning("Firstname and lastname are required for name+address search")
             return self._format_results_to_json([])
 
-        query = """
+        # Validate names
+        is_valid, error = validate_name(firstname, "firstname")
+        if not is_valid:
+            self.logger.warning(f"Invalid firstname: {error}")
+            return self._format_results_to_json([])
+
+        is_valid, error = validate_name(lastname, "lastname")
+        if not is_valid:
+            self.logger.warning(f"Invalid lastname: {error}")
+            return self._format_results_to_json([])
+
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
+        query = f"""
         SELECT * FROM (
             SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_1' as source_table
             FROM ssn_1 WHERE firstname = ? COLLATE NOCASE AND lastname = ? COLLATE NOCASE AND address = ? COLLATE NOCASE
@@ -301,20 +406,24 @@ class SearchEngine:
         ){limit_clause}
         """
 
-        # Add LIMIT clause if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
-
         self.logger.info("Searching by name+address")
-        results = self._execute_search(query, (firstname, lastname, address, firstname, lastname, address, firstname, lastname, address))
+        results = self._execute_search(
+            query,
+            (firstname, lastname, address, firstname, lastname, address, firstname, lastname, address),
+            limit_params
+        )
 
         return self._format_results_to_json(results)
 
     def _search_by_phone_match(self, firstname, lastname, all_phones, limit=None):
         """
         Search for SSN records by firstname + lastname + phone.
+
+        Security:
+            - Sanitizes names before search
+            - Phone numbers are normalized (digits only)
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Args:
             firstname: First name
@@ -326,6 +435,13 @@ class SearchEngine:
             list: Matching records
         """
         if not all_phones or len(all_phones) == 0:
+            return []
+
+        # Sanitize names
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+
+        if not firstname or not lastname:
             return []
 
         # Normalize phone numbers (remove formatting)
@@ -343,6 +459,9 @@ class SearchEngine:
 
         if not normalized_phones:
             return []
+
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
 
         # Build query
         phone_placeholders = ','.join(['?'] * len(normalized_phones))
@@ -365,23 +484,23 @@ class SearchEngine:
             WHERE firstname = ? COLLATE NOCASE
               AND lastname = ? COLLATE NOCASE
               AND REPLACE(REPLACE(REPLACE(phone, '(', ''), ')', ''), '-', '') IN ({phone_placeholders})
-        ){{limit_clause}}
+        ){limit_clause}
         """
-
-        # Add LIMIT if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
 
         params = [firstname, lastname] + normalized_phones + [firstname, lastname] + normalized_phones + [firstname, lastname] + normalized_phones
 
         self.logger.info(f"Priority 1: Searching by phone ({len(normalized_phones)} numbers)")
-        return self._execute_search(query, tuple(params))
+        return self._execute_search(query, tuple(params), limit_params)
 
     def _search_by_address_match(self, firstname, lastname, all_addresses, limit=None):
         """
         Search for SSN records by firstname + lastname + address.
+
+        Security:
+            - Sanitizes names before search
+            - Address patterns are normalized
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Uses address normalization to match different formats:
         - "5800 N COLRAIN AVE" matches "5800 NORTH COLRAIN AVENUE"
@@ -399,12 +518,24 @@ class SearchEngine:
         if not all_addresses or len(all_addresses) == 0:
             return []
 
+        # Sanitize names
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+
+        if not firstname or not lastname:
+            return []
+
         # Generate multiple variants of each address for better matching
         all_search_patterns = []
         seen_patterns = set()
 
         for addr in all_addresses:
             if not addr or not isinstance(addr, str):
+                continue
+
+            # Sanitize address
+            addr = sanitize_address(addr) or ""
+            if not addr:
                 continue
 
             # Generate normalized variants
@@ -434,6 +565,9 @@ class SearchEngine:
 
         self.logger.info(f"Priority 2: Searching by address ({len(all_addresses)} addresses -> {len(all_search_patterns)} patterns)")
 
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
         # Build query with LIKE conditions
         address_conditions = []
         for _ in all_search_patterns:
@@ -460,22 +594,22 @@ class SearchEngine:
             WHERE firstname = ? COLLATE NOCASE
               AND lastname = ? COLLATE NOCASE
               AND ({address_clause})
-        ){{limit_clause}}
+        ){limit_clause}
         """
-
-        # Add LIMIT if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
 
         params = [firstname, lastname] + all_search_patterns + [firstname, lastname] + all_search_patterns + [firstname, lastname] + all_search_patterns
 
-        return self._execute_search(query, tuple(params))
+        return self._execute_search(query, tuple(params), limit_params)
 
     def _search_by_zip_match(self, firstname, lastname, all_zips, limit=None):
         """
         Search for SSN records by firstname + lastname + ZIP.
+
+        Security:
+            - Sanitizes names before search
+            - ZIP codes are normalized
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Args:
             firstname: First name
@@ -489,8 +623,29 @@ class SearchEngine:
         if not all_zips or len(all_zips) == 0:
             return []
 
+        # Sanitize names
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+
+        if not firstname or not lastname:
+            return []
+
+        # Normalize ZIP codes (keep only valid ones)
+        normalized_zips = []
+        for z in all_zips:
+            if z:
+                z_clean = sanitize_string(str(z).strip(), max_length=10)
+                if z_clean:
+                    normalized_zips.append(z_clean)
+
+        if not normalized_zips:
+            return []
+
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
         # Build query
-        zip_placeholders = ','.join(['?'] * len(all_zips))
+        zip_placeholders = ','.join(['?'] * len(normalized_zips))
         query = f"""
         SELECT * FROM (
             SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_1' as source_table
@@ -510,24 +665,24 @@ class SearchEngine:
             WHERE firstname = ? COLLATE NOCASE
               AND lastname = ? COLLATE NOCASE
               AND zip IN ({zip_placeholders})
-        ){{limit_clause}}
+        ){limit_clause}
         """
 
-        # Add LIMIT if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
+        params = [firstname, lastname] + normalized_zips + [firstname, lastname] + normalized_zips + [firstname, lastname] + normalized_zips
 
-        params = [firstname, lastname] + list(all_zips) + [firstname, lastname] + list(all_zips) + [firstname, lastname] + list(all_zips)
-
-        self.logger.info(f"Priority 3: Searching by ZIP ({len(all_zips)} codes)")
-        return self._execute_search(query, tuple(params))
+        self.logger.info(f"Priority 3: Searching by ZIP ({len(normalized_zips)} codes)")
+        return self._execute_search(query, tuple(params), limit_params)
 
     def _search_by_state_match(self, firstname, lastname, all_states, limit=None):
         """
         Search for SSN records by firstname + lastname + state.
         Priority 4 fallback - less precise but catches outdated addresses.
+
+        Security:
+            - Sanitizes names before search
+            - State codes are validated (2 uppercase letters)
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
 
         Args:
             firstname: First name
@@ -541,16 +696,26 @@ class SearchEngine:
         if not all_states or len(all_states) == 0:
             return []
 
+        # Sanitize names
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+
+        if not firstname or not lastname:
+            return []
+
         # Normalize states (uppercase, 2 letters only)
         normalized_states = []
         for state in all_states:
             if state and isinstance(state, str):
                 state_clean = state.upper().strip()
-                if len(state_clean) == 2:
+                if len(state_clean) == 2 and state_clean.isalpha():
                     normalized_states.append(state_clean)
 
         if not normalized_states:
             return []
+
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
 
         # Build query
         state_placeholders = ','.join(['?'] * len(normalized_states))
@@ -573,23 +738,22 @@ class SearchEngine:
             WHERE firstname = ? COLLATE NOCASE
               AND lastname = ? COLLATE NOCASE
               AND state IN ({state_placeholders})
-        ){{limit_clause}}
+        ){limit_clause}
         """
-
-        # Add LIMIT if specified
-        if limit is not None:
-            query = query.format(limit_clause=f" LIMIT {int(limit)}")
-        else:
-            query = query.format(limit_clause="")
 
         params = [firstname, lastname] + normalized_states + [firstname, lastname] + normalized_states + [firstname, lastname] + normalized_states
 
         self.logger.info(f"Priority 4: Searching by STATE ({len(normalized_states)} states: {normalized_states})")
-        return self._execute_search(query, tuple(params))
+        return self._execute_search(query, tuple(params), limit_params)
 
     def search_by_searchbug_data(self, firstname, lastname, all_zips=None, all_phones=None, all_addresses=None, all_states=None, limit=None):
         """
         Search for SSN records matching external API data with priority-based matching.
+
+        Security:
+            - Validates and sanitizes all input parameters
+            - Uses parameterized queries throughout
+            - LIMIT is validated and parameterized
 
         Priority order (stops at first match):
         1. firstname + lastname + phone (if phones provided)
@@ -610,13 +774,24 @@ class SearchEngine:
         Returns:
             list: List of matching records (as dicts, not JSON string)
         """
-        # Normalize input data
-        firstname = str(firstname).strip()
-        lastname = str(lastname).strip()
+        # Sanitize and normalize input data
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
 
         # Validate required fields
         if not firstname or not lastname:
             self.logger.warning("Firstname and lastname are required")
+            return []
+
+        # Validate names
+        is_valid, error = validate_name(firstname, "firstname")
+        if not is_valid:
+            self.logger.warning(f"Invalid firstname in searchbug data: {error}")
+            return []
+
+        is_valid, error = validate_name(lastname, "lastname")
+        if not is_valid:
+            self.logger.warning(f"Invalid lastname in searchbug data: {error}")
             return []
 
         self.logger.info(
@@ -700,6 +875,12 @@ class SearchEngine:
         """
         Fallback search method: find records by exact address + DOB + firstname (without lastname).
 
+        Security:
+            - Sanitizes firstname and addresses
+            - Validates DOB format
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
+
         This method is useful when external API and local database have different last names
         for the same person (e.g., maiden name vs married name).
 
@@ -721,9 +902,18 @@ class SearchEngine:
             self.logger.debug("Missing required fields for address+DOB+firstname search")
             return []
 
-        # Normalize firstname and DOB
-        firstname = str(firstname).strip().upper()
-        dob = str(dob).strip()
+        # Sanitize and normalize firstname
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        if not firstname:
+            self.logger.warning("Empty firstname after sanitization")
+            return []
+        firstname = firstname.upper()
+
+        # Sanitize DOB (max length protection against DoS)
+        dob = sanitize_string(str(dob).strip(), max_length=20) or ""
+        if not dob:
+            self.logger.warning("Empty DOB after sanitization")
+            return []
 
         # Convert DOB to YYYYMMDD format if needed (from MM/DD/YYYY)
         if '/' in dob:
@@ -740,10 +930,18 @@ class SearchEngine:
             f"{len(addresses)} address(es)"
         )
 
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
         all_matches = []
 
         # Try each address
         for address in addresses:
+            if not address:
+                continue
+
+            # Sanitize address
+            address = sanitize_address(str(address).strip()) or ""
             if not address:
                 continue
 
@@ -779,11 +977,11 @@ class SearchEngine:
             # Combine queries with UNION
             query = ' UNION '.join(query_parts)
 
-            if limit:
-                query += f" LIMIT {limit}"
+            # Add parameterized LIMIT
+            query += limit_clause
 
             try:
-                matches = self._execute_search(query, tuple(params))
+                matches = self._execute_search(query, tuple(params), limit_params)
                 if matches:
                     all_matches.extend(matches)
                     self.logger.info(

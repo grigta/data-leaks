@@ -1,6 +1,7 @@
 """Main bot entry point."""
 import asyncio
 import logging
+import os
 
 from aiogram import Bot, Dispatcher
 
@@ -9,13 +10,23 @@ from handlers import register_handlers
 from middlewares import setup_middlewares
 from websocket_client import WebSocketClient
 from api.common.database import async_engine
+from api.common.logging_config import setup_logging, get_logger
+from api.common.security_logger import SecurityEventLogger
 
-
-logger = logging.getLogger(__name__)
+# Bootstrap logger for use before structured logging is configured
+# This is used only in the __main__ block for early errors
+_bootstrap_logger = logging.getLogger("telegram_bot.bootstrap")
 
 
 async def main():
     """Main bot function."""
+    # Setup structured logging
+    log_level = os.getenv('LOG_LEVEL', 'INFO')
+    json_enabled = os.getenv('LOG_JSON_ENABLED', 'true').lower() in ('true', '1', 'yes')
+    setup_logging(service_name="telegram_bot", log_level=log_level, json_enabled=json_enabled)
+    logger = get_logger(__name__)
+    security_logger = SecurityEventLogger("telegram_bot")
+
     bot = None
     ws_client = None
     ws_task = None
@@ -33,6 +44,15 @@ async def main():
         # Log bot info
         bot_info = await bot.get_me()
         logger.info(f"Bot started: @{bot_info.username} ({bot_info.id})")
+        await security_logger.log_service_startup(
+            version="1.0.0",
+            config={
+                "bot_id": bot_info.id,
+                "username": bot_info.username,
+                "log_level": log_level,
+                "json_logging": json_enabled
+            }
+        )
 
         # Register middlewares
         setup_middlewares(dp)
@@ -60,10 +80,28 @@ async def main():
 
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
+
+        # Log fatal error for alerting
+        try:
+            await security_logger.log_server_error(
+                path="telegram_bot_main",
+                error_type=type(e).__name__,
+                client_ip="bot"
+            )
+        except Exception as alert_err:
+            logger.warning(f"Failed to log server error alert: {alert_err}")
+
+        # Log database errors specifically
+        error_str = str(e).lower()
+        error_type = type(e).__name__.lower()
+        if any(db_indicator in error_str or db_indicator in error_type
+               for db_indicator in ['database', 'connection', 'pool', 'sqlalchemy', 'asyncpg', 'postgres']):
+            await security_logger.log_db_connection_failure(e)
         raise
 
     finally:
         # Graceful shutdown
+        await security_logger.log_service_shutdown("graceful")
         logger.info("Bot stopping...")
 
         # Stop WebSocket client
@@ -106,6 +144,6 @@ if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        _bootstrap_logger.info("Bot stopped by user (KeyboardInterrupt)")
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+        _bootstrap_logger.error(f"Fatal error during startup: {e}", exc_info=True)

@@ -1,19 +1,21 @@
-"""Bot configuration module."""
+"""Bot configuration module.
+
+Note: Logging configuration is handled by api.common.logging_config module in main.py.
+"""
 import os
 import logging
 from typing import Optional
 
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Get logger (logging is configured in main.py via setup_logging)
 logger = logging.getLogger(__name__)
 
 
 class BotConfig:
-    """Bot configuration class."""
+    """Bot configuration class.
+
+    Note: Logging configuration is centralized in api.common.logging_config module.
+    """
 
     def __init__(self):
         """Initialize bot configuration from environment variables."""
@@ -26,9 +28,6 @@ class BotConfig:
         self.ws_reconnect_delay: int = int(os.getenv('WS_RECONNECT_DELAY', '5'))
         self.ws_max_reconnect_delay: int = int(os.getenv('WS_MAX_RECONNECT_DELAY', '300'))
         self.ws_heartbeat_interval: int = int(os.getenv('WS_HEARTBEAT_INTERVAL', '30'))
-
-        # Apply log level
-        logging.getLogger().setLevel(getattr(logging, self.log_level.upper()))
 
     @property
     def ws_url(self) -> str:
