@@ -170,8 +170,6 @@ async def validate_coupon(
         )
 
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error validating coupon: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
