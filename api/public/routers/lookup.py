@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.common.database import get_postgres_session
+from api.common.database import get_postgres_session, SQLITE_PATH
 from api.common.models_postgres import User, Subscription
 from api.public.dependencies import get_current_user
 from database.search_engine import SearchEngine
@@ -99,8 +99,8 @@ async def search_database(
             detail="Active subscription required to search database"
         )
 
-    # Initialize search engine
-    search_engine = SearchEngine()
+    # Initialize search engine with correct path from environment
+    search_engine = SearchEngine(db_path=SQLITE_PATH)
 
     # Perform search based on available parameters
     results = []
