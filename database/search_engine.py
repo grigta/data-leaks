@@ -871,6 +871,166 @@ class SearchEngine:
         self.logger.info("No SSN matches found with any criteria")
         return []
 
+    def search_by_fields(self, firstname, lastname, city=None, state=None, phone=None, zip=None, limit=None):
+        """
+        Search for SSN records by firstname + lastname with optional filters.
+
+        This is a flexible search method that accepts various optional parameters
+        and uses priority-based matching:
+        1. firstname + lastname + phone (if provided)
+        2. firstname + lastname + city + state (if both provided)
+        3. firstname + lastname + zip (if provided)
+        4. firstname + lastname + state (if provided, fallback)
+
+        Security:
+            - Validates and sanitizes all input parameters
+            - Uses parameterized queries throughout
+            - LIMIT is validated and parameterized
+
+        Args:
+            firstname: First name to search for (required)
+            lastname: Last name to search for (required)
+            city: City name (optional)
+            state: State code, 2 letters (optional)
+            phone: Phone number (optional)
+            zip: ZIP code (optional)
+            limit: Optional maximum number of results to return
+
+        Returns:
+            str: JSON string with matching records
+        """
+        # Sanitize and normalize required fields
+        firstname = sanitize_name(str(firstname).strip()) if firstname else ""
+        lastname = sanitize_name(str(lastname).strip()) if lastname else ""
+
+        # Validate required fields
+        if not firstname or not lastname:
+            self.logger.warning("Firstname and lastname are required for search_by_fields")
+            return self._format_results_to_json([])
+
+        # Validate names
+        is_valid, error = validate_name(firstname, "firstname")
+        if not is_valid:
+            self.logger.warning(f"Invalid firstname in search_by_fields: {error}")
+            return self._format_results_to_json([])
+
+        is_valid, error = validate_name(lastname, "lastname")
+        if not is_valid:
+            self.logger.warning(f"Invalid lastname in search_by_fields: {error}")
+            return self._format_results_to_json([])
+
+        self.logger.info(
+            f"search_by_fields: {firstname} {lastname}, "
+            f"city={city}, state={state}, phone={phone}, zip={zip}"
+        )
+
+        # Priority 1: Try phone search if provided
+        if phone:
+            results = self._search_by_phone_match(firstname, lastname, [phone], limit)
+            if results and len(results) > 0:
+                self.logger.info(f"✓ Found {len(results)} match(es) by PHONE")
+                return self._format_results_to_json(results)
+            self.logger.info("✗ No matches by phone")
+
+        # Priority 2: Try city + state search if both provided
+        if city and state:
+            results = self._search_by_city_state_match(firstname, lastname, city, state, limit)
+            if results and len(results) > 0:
+                self.logger.info(f"✓ Found {len(results)} match(es) by CITY+STATE")
+                return self._format_results_to_json(results)
+            self.logger.info("✗ No matches by city+state")
+
+        # Priority 3: Try ZIP search if provided
+        if zip:
+            results = self._search_by_zip_match(firstname, lastname, [zip], limit)
+            if results and len(results) > 0:
+                self.logger.info(f"✓ Found {len(results)} match(es) by ZIP")
+                return self._format_results_to_json(results)
+            self.logger.info("✗ No matches by ZIP")
+
+        # Priority 4: Try state search (fallback)
+        if state:
+            results = self._search_by_state_match(firstname, lastname, [state], limit)
+            if results and len(results) > 0:
+                self.logger.info(f"✓ Found {len(results)} match(es) by STATE")
+                return self._format_results_to_json(results)
+            self.logger.info("✗ No matches by state")
+
+        # No matches found
+        self.logger.info("No matches found with any criteria in search_by_fields")
+        return self._format_results_to_json([])
+
+    def _search_by_city_state_match(self, firstname, lastname, city, state, limit=None):
+        """
+        Search for SSN records by firstname + lastname + city + state.
+
+        Security:
+            - Sanitizes names, city and state before search
+            - Uses parameterized queries
+            - LIMIT is validated and parameterized
+
+        Args:
+            firstname: First name
+            lastname: Last name
+            city: City name
+            state: State code (2-letter)
+            limit: Optional limit
+
+        Returns:
+            list: Matching records
+        """
+        # Sanitize names
+        firstname = sanitize_name(str(firstname).strip()) or ""
+        lastname = sanitize_name(str(lastname).strip()) or ""
+
+        if not firstname or not lastname:
+            return []
+
+        # Sanitize city and state
+        city = sanitize_string(str(city).strip(), max_length=100) if city else ""
+        state = state.upper().strip() if state and isinstance(state, str) else ""
+
+        if not city or not state:
+            return []
+
+        # Validate state format (2 uppercase letters)
+        if len(state) != 2 or not state.isalpha():
+            self.logger.warning(f"Invalid state format: {state}")
+            return []
+
+        # Get safe LIMIT clause and params
+        limit_clause, limit_params = self._safe_limit(limit)
+
+        query = f"""
+        SELECT * FROM (
+            SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_1' as source_table
+            FROM ssn_1
+            WHERE firstname = ? COLLATE NOCASE
+              AND lastname = ? COLLATE NOCASE
+              AND city = ? COLLATE NOCASE
+              AND state = ?
+            UNION ALL
+            SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_2' as source_table
+            FROM ssn_2
+            WHERE firstname = ? COLLATE NOCASE
+              AND lastname = ? COLLATE NOCASE
+              AND city = ? COLLATE NOCASE
+              AND state = ?
+            UNION ALL
+            SELECT id, firstname, lastname, address, city, state, zip, phone, ssn, dob, email, 'ssn_3' as source_table
+            FROM ssn_3
+            WHERE firstname = ? COLLATE NOCASE
+              AND lastname = ? COLLATE NOCASE
+              AND city = ? COLLATE NOCASE
+              AND state = ?
+        ){limit_clause}
+        """
+
+        params = (firstname, lastname, city, state) * 3
+
+        self.logger.info(f"Searching by name+city+state: {city}, {state}")
+        return self._execute_search(query, params, limit_params)
+
     def search_by_address_dob_firstname(self, addresses, dob, firstname, limit=None):
         """
         Fallback search method: find records by exact address + DOB + firstname (without lastname).

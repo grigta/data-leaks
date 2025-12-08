@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { z } from 'zod';
-	import { instantSSNSearch, type InstantSSNResult, type InstantSSNResponse, handleApiError, getCurrentUser, acceptInstantSSNRules, createManualSSNTicket, getMaintenanceStatus, checkSubscriptionAccess, type CheckAccessResponse } from '$lib/api/client';
+	import { instantSSNSearch, type InstantSSNResult, type InstantSSNResponse, handleApiError, getCurrentUser, acceptInstantSSNRules, createManualSSNTicket, getMaintenanceStatus } from '$lib/api/client';
 	import { parseFullName } from '$lib/utils';
 	import { refreshUser } from '$lib/stores/auth';
 	import { Button } from '$lib/components/ui/button';
@@ -21,7 +21,6 @@
 	import Send from '@lucide/svelte/icons/send';
 	import Eye from '@lucide/svelte/icons/eye';
 	import Wrench from '@lucide/svelte/icons/wrench';
-	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import InstantSSNRulesModal from '$lib/components/InstantSSNRulesModal.svelte';
 	import InstantSSNResultModal from '$lib/components/InstantSSNResultModal.svelte';
 	import InstantSSNFoundModal from '$lib/components/InstantSSNFoundModal.svelte';
@@ -52,8 +51,6 @@
 	let showFoundModal = $state(false);
 	let showNotFoundModal = $state(false);
 	let currentSearchData = $state<{ firstname: string; lastname: string; address: string } | null>(null);
-	let subscriptionStatus = $state<CheckAccessResponse | null>(null);
-	let isCheckingSubscription = $state(true);
 
 	const form = $state({
 		fullname: '',
@@ -110,17 +107,6 @@
 			console.error('[INSTANT-SSN] Error checking user:', error);
 			errorMessage = handleApiError(error);
 			isCheckingRules = false;
-		}
-	}
-
-	async function checkSubscription() {
-		try {
-			subscriptionStatus = await checkSubscriptionAccess();
-			isCheckingSubscription = false;
-		} catch (error: any) {
-			console.error('[LOOKUP-SSN] Error checking subscription:', error);
-			subscriptionStatus = { has_access: false, message: 'Failed to check subscription status' };
-			isCheckingSubscription = false;
 		}
 	}
 
@@ -233,7 +219,6 @@
 	onMount(() => {
 		checkMaintenanceMode();
 		checkFirstVisit();
-		checkSubscription();
 	});
 
 	async function handleSendToManualSearch() {
@@ -336,32 +321,10 @@
 />
 
 <div class="mx-auto py-8 px-4 max-w-[1400px] w-full">
-	{#if isCheckingMaintenance || isCheckingRules || isCheckingSubscription}
+	{#if isCheckingMaintenance || isCheckingRules}
 		<div class="flex justify-center items-center py-12">
 			<Loader2 class="h-8 w-8 animate-spin" />
 		</div>
-	{:else if !subscriptionStatus?.has_access}
-		<Card>
-			<CardHeader class="text-center">
-				<CardTitle class="text-2xl">Instant SSN Search</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<div class="flex flex-col items-center justify-center py-12 gap-6">
-					<div class="rounded-full bg-orange-100 p-6">
-						<CreditCard class="h-16 w-16 text-orange-600" />
-					</div>
-					<div class="text-center space-y-3 max-w-md">
-						<h3 class="text-2xl font-semibold">Subscription Required</h3>
-						<p class="text-lg text-muted-foreground">
-							You need an active subscription to use the Instant SSN Search feature. Purchase a subscription plan to get unlimited access.
-						</p>
-					</div>
-					<Button size="lg" onclick={() => goto('/subscription')}>
-						View Subscription Plans
-					</Button>
-				</div>
-			</CardContent>
-		</Card>
 	{:else if isMaintenanceMode}
 		<Card>
 			<CardHeader class="text-center">

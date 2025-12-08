@@ -114,18 +114,15 @@ async def get_current_user_with_subscription(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check for active subscription
+    # Check for active subscription using Subscription.is_valid() method
     result = await db.execute(
         select(Subscription)
-        .where(
-            Subscription.user_id == user.id,
-            Subscription.is_active == True,
-            Subscription.end_date > datetime.utcnow()
-        )
+        .where(Subscription.user_id == user.id)
+        .order_by(Subscription.end_date.desc())
     )
     subscription = result.scalar_one_or_none()
 
-    if not subscription:
+    if not subscription or not subscription.is_valid():
         raise HTTPException(
             status_code=403,
             detail="Active subscription required. Please purchase a subscription to access this feature."
