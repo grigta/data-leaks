@@ -9,7 +9,7 @@ from typing import Dict, List
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from api.public.routers import auth_router, search_router, ecommerce_router, stats_router, enrichment_router, billing_router, news_router, tickets_router, internal_router, support, contact, maintenance_router, admin_router, phone_lookup_router, subscriptions_router
+from api.public.routers import auth_router, search_router, ecommerce_router, stats_router, enrichment_router, billing_router, news_router, tickets_router, internal_router, support, contact, maintenance_router, admin_router, phone_lookup_router, subscriptions_router, lookup_router
 from api.common.database import dispose_engine
 from api.public.websocket import public_ws_manager
 from api.public.dependencies import get_current_user_ws
@@ -169,6 +169,7 @@ app.include_router(maintenance_router, prefix="/maintenance", tags=["Maintenance
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 app.include_router(phone_lookup_router, prefix="/phone-lookup", tags=["Phone Lookup"])
 app.include_router(subscriptions_router, prefix="/subscriptions", tags=["Subscriptions"])
+app.include_router(lookup_router, prefix="/lookup", tags=["Lookup"])
 app.include_router(internal_router, tags=["Internal"])
 
 
