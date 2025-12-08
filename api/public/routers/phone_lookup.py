@@ -197,6 +197,15 @@ async def get_services(
             for s in services_data
         ]
 
+        # If API returned empty or invalid list, use fallback
+        if not services:
+            logger.warning("DaisySMS API returned empty services list, using fallback")
+            from api.common.daisysms_services import ALL_SERVICE_CODES
+            services = [
+                DaisySMSService(code=code, name=get_service_name(code))
+                for code in sorted(ALL_SERVICE_CODES, key=lambda x: get_service_name(x).lower())
+            ]
+
         return DaisySMSServicesResponse(services=services)
 
     except DaisySMSError as e:

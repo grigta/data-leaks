@@ -482,6 +482,10 @@ class DaisySMSClient:
         if skipped_fields:
             logger.debug(f"Skipped metadata fields: {skipped_fields}")
 
+        # Log warning if no valid services after parsing
+        if not services:
+            logger.warning(f"No valid services parsed. Raw response (first 500 chars): {response[:500]}")
+
         # Sort by name
         services.sort(key=lambda x: x["name"].lower())
 
