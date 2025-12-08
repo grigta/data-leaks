@@ -233,6 +233,7 @@ jobs:
           UVICORN_WORKERS_ADMIN=2
           LOG_LEVEL=INFO
           LOG_JSON_ENABLED=true
+          DAISYSMS_API_KEY=${{ secrets.DAISYSMS_API_KEY }}
           EOF
           sed -i 's/^[[:space:]]*//' .env
 
