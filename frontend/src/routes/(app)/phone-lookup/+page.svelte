@@ -63,7 +63,11 @@
 		try {
 			isLoadingServices = true;
 			const response = await getPhoneLookupServices();
-			services = response.services;
+			// Filter out potential metadata fields that shouldn't appear in the list
+			const metadataFields = new Set(['count', 'total', 'status', 'error', 'message']);
+			services = response.services.filter(
+				(s) => s.code && s.name && !metadataFields.has(s.code.toLowerCase())
+			);
 			dev && console.log('[PHONE-LOOKUP] Loaded services:', services.length);
 		} catch (error: any) {
 			console.error('[PHONE-LOOKUP] Error loading services:', error);

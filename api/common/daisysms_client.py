@@ -450,13 +450,24 @@ class DaisySMSClient:
         })
 
         # Parse response (format: service_code:price,service_code:price,...)
+        # API may include metadata fields like "count:N" which should be skipped
+        METADATA_FIELDS = {"count", "total", "status", "error", "message"}
+
         services = []
+        skipped_fields = []
+
         for item in response.split(","):
             item = item.strip()
             if ":" in item:
                 parts = item.split(":")
                 if len(parts) >= 2:
-                    code = parts[0].strip()
+                    code = parts[0].strip().lower()
+
+                    # Skip metadata/service fields
+                    if code in METADATA_FIELDS:
+                        skipped_fields.append(code)
+                        continue
+
                     try:
                         price = float(parts[1].strip())
                     except ValueError:
@@ -467,6 +478,9 @@ class DaisySMSClient:
                         "name": SERVICE_CODE_TO_NAME.get(code, code.title()),
                         "price": price
                     })
+
+        if skipped_fields:
+            logger.debug(f"Skipped metadata fields: {skipped_fields}")
 
         # Sort by name
         services.sort(key=lambda x: x["name"].lower())
