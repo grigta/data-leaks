@@ -53,7 +53,7 @@ from api.common.pricing import PHONE_LOOKUP_PRICE, get_user_price
 from database.search_engine import SearchEngine
 
 
-router = APIRouter(prefix="/phone-lookup", tags=["Phone Lookup"])
+router = APIRouter(tags=["Phone Lookup"])
 logger = logging.getLogger(__name__)
 
 
