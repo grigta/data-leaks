@@ -82,6 +82,8 @@ services:
       BOT_API_KEY: ${BOT_API_KEY:-change_me_bot_api_key_min_32_chars}
       # Internal API configuration
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      # DaisySMS API for Phone Lookup
+      DAISYSMS_API_KEY: ${DAISYSMS_API_KEY}
     volumes:
       - ./data:/app/data
     ports:
