@@ -2,7 +2,6 @@
 Subscriptions router for Public API.
 """
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
@@ -25,7 +24,7 @@ class SubscriptionPlanResponse(BaseModel):
     id: UUID
     name: str
     duration_months: int
-    price: Decimal
+    price: float
     discount_percent: int
 
     class Config:
