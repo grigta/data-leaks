@@ -219,10 +219,6 @@
 									<div class="px-4 py-3 text-center text-muted-foreground bg-background">{$t('phone-lookup.noServicesFound')}</div>
 								{/each}
 							</div>
-						{:else}
-							<p class="text-sm text-muted-foreground">
-								{$t('phone-lookup.typeToSearch')}
-							</p>
 						{/if}
 					</div>
 
