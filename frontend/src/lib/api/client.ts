@@ -1247,6 +1247,134 @@ export const cancelPhoneRental = async (rentalId: string): Promise<{ success: bo
   return response.data;
 };
 
+// Phone Lookup SMS Code API
+export interface PhoneRentalCheckCodeResponse {
+  success: boolean;
+  status: 'pending' | 'code_received' | 'cancelled' | 'expired' | 'finished' | 'error';
+  sms_code?: string;
+  message?: string;
+}
+
+export interface PhoneRentalFinishResponse {
+  success: boolean;
+  message?: string;
+}
+
+export const checkPhoneRentalCode = async (rentalId: string): Promise<PhoneRentalCheckCodeResponse> => {
+  const response = await apiClient.post<PhoneRentalCheckCodeResponse>(`/phone-lookup/rentals/${rentalId}/check-code`);
+  return response.data;
+};
+
+export const finishPhoneRental = async (rentalId: string): Promise<PhoneRentalFinishResponse> => {
+  const response = await apiClient.post<PhoneRentalFinishResponse>(`/phone-lookup/rentals/${rentalId}/finish`);
+  return response.data;
+};
+
+// SMS Service Types
+export interface SMSService {
+  code: string;
+  name: string;
+  base_price: number;
+  user_price: number;
+}
+
+export interface SMSServicesResponse {
+  services: SMSService[];
+}
+
+export interface SMSGetNumberResponse {
+  success: boolean;
+  rental_id?: string;
+  phone_number?: string;
+  service_name?: string;
+  user_price?: number;
+  expires_at?: string;
+  error?: string;
+  message?: string;
+  new_balance?: number;
+}
+
+export interface SMSCheckCodeResponse {
+  success: boolean;
+  status: 'pending' | 'code_received' | 'cancelled' | 'expired' | 'finished' | 'error';
+  sms_code?: string;
+  message?: string;
+}
+
+export interface SMSCancelResponse {
+  success: boolean;
+  refunded: boolean;
+  refund_amount?: number;
+  new_balance?: number;
+  message?: string;
+}
+
+export interface SMSFinishResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface SMSRentalHistoryItem {
+  id: string;
+  phone_number: string;
+  service_code: string;
+  service_name: string;
+  status: string;
+  base_price: number;
+  user_price: number;
+  sms_code?: string;
+  refunded: boolean;
+  created_at: string;
+  expires_at?: string;
+}
+
+export interface SMSRentalsResponse {
+  rentals: SMSRentalHistoryItem[];
+  total: number;
+}
+
+// SMS Service API
+export const getSMSServices = async (): Promise<SMSServicesResponse> => {
+  const response = await apiClient.get<SMSServicesResponse>('/sms/services');
+  return response.data;
+};
+
+export const getSMSNumber = async (serviceCode: string): Promise<SMSGetNumberResponse> => {
+  const response = await apiClient.post<SMSGetNumberResponse>('/sms/get-number', {
+    service_code: serviceCode
+  });
+  return response.data;
+};
+
+export const checkSMSCode = async (rentalId: string): Promise<SMSCheckCodeResponse> => {
+  const response = await apiClient.post<SMSCheckCodeResponse>('/sms/check-code', {
+    rental_id: rentalId
+  });
+  return response.data;
+};
+
+export const cancelSMSRental = async (rentalId: string): Promise<SMSCancelResponse> => {
+  const response = await apiClient.post<SMSCancelResponse>('/sms/cancel', {
+    rental_id: rentalId
+  });
+  return response.data;
+};
+
+export const finishSMSRental = async (rentalId: string): Promise<SMSFinishResponse> => {
+  const response = await apiClient.post<SMSFinishResponse>('/sms/finish', {
+    rental_id: rentalId
+  });
+  return response.data;
+};
+
+export const getSMSRentals = async (params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<SMSRentalsResponse> => {
+  const response = await apiClient.get<SMSRentalsResponse>('/sms/rentals', { params });
+  return response.data;
+};
+
 // Error handling helper
 export const handleApiError = (error: unknown): string => {
   // Check if it's an AxiosError

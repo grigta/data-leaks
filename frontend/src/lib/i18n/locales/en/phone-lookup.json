@@ -28,5 +28,15 @@
 	"cost": "Cost",
 	"costDescription": "$3.00 per lookup (charged only if SSN is found)",
 	"costHint": "Select a service to get a phone number. The number will be searched in our database to find associated personal information including SSN.",
-	"viewHistory": "View History"
+	"viewHistory": "View History",
+	"smsCode": "SMS Code",
+	"waitingForSms": "Waiting for SMS...",
+	"codeReceived": "Code received",
+	"cancelRefund": "Cancel & Refund",
+	"finish": "Finish",
+	"cancelled": "Cancelled",
+	"expired": "Expired",
+	"finished": "Finished",
+	"cancelError": "Failed to cancel rental",
+	"cancelledRefund": "Cancelled and refunded"
 }

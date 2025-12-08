@@ -1,5 +1,5 @@
 """Centralized pricing constants and helper functions for API."""
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,32 @@ SEARCHBUG_API_COST = Decimal("0.77")
 # Invitation/Referral bonuses (configurable via environment variables)
 INVITATION_BONUS_INVITEE = Decimal(os.getenv("INVITATION_BONUS_INVITEE", "5.00"))  # Bonus for new user who registers with invitation code
 INVITATION_BONUS_INVITER = Decimal(os.getenv("INVITATION_BONUS_INVITER", "3.00"))  # Bonus for user who invited someone
+
+# SMS Service pricing
+SMS_MARKUP = Decimal("1.20")  # 20% markup on DaisySMS prices
+
+
+def round_price_to_5_cents(base_price: Decimal, markup: Decimal = SMS_MARKUP) -> Decimal:
+    """
+    Calculate price with markup and round to nearest 5 cents.
+
+    Examples:
+        - $0.40 * 1.20 = $0.48 → $0.50
+        - $0.50 * 1.20 = $0.60 → $0.60
+        - $0.73 * 1.20 = $0.876 → $0.90
+        - $1.00 * 1.20 = $1.20 → $1.20
+
+    Args:
+        base_price: Base price from DaisySMS
+        markup: Markup multiplier (default 1.20 = 20% markup)
+
+    Returns:
+        Decimal: Price rounded to nearest 0.05
+    """
+    price_with_markup = base_price * markup
+    step = Decimal("0.05")
+    rounded = (price_with_markup / step).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * step
+    return rounded.quantize(Decimal("0.01"))
 
 
 async def get_user_price(

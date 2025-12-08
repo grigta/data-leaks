@@ -86,6 +86,7 @@ services:
       DAISYSMS_API_KEY: ${DAISYSMS_API_KEY}
     volumes:
       - ./data:/app/data
+      - ./api:/app/api
     ports:
       - "8000:8000"
     networks:

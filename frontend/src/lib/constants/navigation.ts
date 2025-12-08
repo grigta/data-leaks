@@ -10,6 +10,7 @@ import HelpCircle from '@lucide/svelte/icons/help-circle';
 import MessageCircle from '@lucide/svelte/icons/message-circle';
 import Phone from '@lucide/svelte/icons/phone';
 import CreditCard from '@lucide/svelte/icons/credit-card';
+import MessageSquare from '@lucide/svelte/icons/message-square';
 
 export interface NavItem {
 	href: string;
@@ -39,6 +40,12 @@ export function getNavItems(t: TranslateFunction): NavItem[] {
 			label: t('navigation.phoneLookup'),
 			icon: Phone,
 			ariaLabel: `Navigate to ${t('navigation.phoneLookup')}`
+		},
+		{
+			href: '/sms',
+			label: t('navigation.sms'),
+			icon: MessageSquare,
+			ariaLabel: `Navigate to ${t('navigation.sms')}`
 		},
 		{
 			href: '/manual-ssn',
@@ -98,6 +105,12 @@ export const NAV_ITEMS: NavItem[] = [
 		label: 'Phone Lookup',
 		icon: Phone,
 		ariaLabel: 'Navigate to Phone Lookup'
+	},
+	{
+		href: '/sms',
+		label: 'SMS Service',
+		icon: MessageSquare,
+		ariaLabel: 'Navigate to SMS Service'
 	},
 	{
 		href: '/manual-ssn',

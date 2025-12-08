@@ -21,6 +21,7 @@ const config: Config = {
 		'/subscription': ['common', 'navigation', 'subscription'],
 		'/lookup-ssn': ['common', 'navigation', 'subscription'],
 		'/phone-lookup': ['common', 'navigation', 'phone-lookup'],
+		'/sms': ['common', 'navigation', 'sms'],
 		// Дефолтный маппинг для всех необработанных маршрутов
 		'*': ['common', 'navigation']
 	},
@@ -106,6 +107,11 @@ const config: Config = {
 			loader: async () => (await import('./locales/en/phone-lookup.json')).default
 		},
 		{
+			locale: 'en',
+			key: 'sms',
+			loader: async () => (await import('./locales/en/sms.json')).default
+		},
+		{
 			locale: 'ru',
 			key: 'common',
 			loader: async () => (await import('./locales/ru/common.json')).default
@@ -184,6 +190,11 @@ const config: Config = {
 			locale: 'ru',
 			key: 'phone-lookup',
 			loader: async () => (await import('./locales/ru/phone-lookup.json')).default
+		},
+		{
+			locale: 'ru',
+			key: 'sms',
+			loader: async () => (await import('./locales/ru/sms.json')).default
 		}
 	],
 	log: {

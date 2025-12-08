@@ -164,6 +164,7 @@ class User(Base):
     abuse_tracking: Mapped[List["InstantSSNAbuseTracking"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     phone_rentals: Mapped[List["PhoneRental"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     phone_lookup_searches: Mapped[List["PhoneLookupSearch"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    sms_rentals: Mapped[List["SMSRental"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     subscriptions: Mapped[List["Subscription"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     support_threads: Mapped[List["SupportThread"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     support_messages: Mapped[List["SupportMessage"]] = relationship(back_populates="user", foreign_keys="[SupportMessage.user_id]", cascade="all, delete-orphan")
@@ -760,6 +761,9 @@ class PhoneRental(Base):
     ssn_found: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ssn_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
+    # SMS code (for phone lookup with SMS verification)
+    sms_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     # Order reference
     order_id: Mapped[Optional[UUID]] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('orders.id', ondelete='SET NULL'), nullable=True)
 
@@ -811,6 +815,44 @@ class PhoneLookupSearch(Base):
         Index('idx_phone_lookup_searches_service_code', 'service_code'),
         Index('idx_phone_lookup_searches_created_at', 'created_at'),
         Index('idx_phone_lookup_searches_ssn_found', 'ssn_found'),
+    )
+
+
+class SMSRental(Base):
+    """SMS rental model for tracking DaisySMS rentals for SMS service (without SSN lookup)."""
+    __tablename__ = "sms_rentals"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    daisysms_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    service_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    service_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[PhoneRentalStatus] = mapped_column(Enum(PhoneRentalStatus), default=PhoneRentalStatus.active, nullable=False)
+
+    # Pricing
+    base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)  # DaisySMS price
+    user_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)  # User price with markup
+    refunded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # SMS code
+    sms_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    code_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="sms_rentals")
+
+    # Table constraints
+    __table_args__ = (
+        Index('idx_sms_rentals_user_id', 'user_id'),
+        Index('idx_sms_rentals_daisysms_id', 'daisysms_id'),
+        Index('idx_sms_rentals_status', 'status'),
+        Index('idx_sms_rentals_created_at', 'created_at'),
+        Index('idx_sms_rentals_service_code', 'service_code'),
     )
 
 

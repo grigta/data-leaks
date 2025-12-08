@@ -2,6 +2,7 @@
 	"dashboard": "Dashboard",
 	"instantSSN": "Instant SSN",
 	"phoneLookup": "Phone Lookup",
+	"sms": "SMS Service",
 	"lookupSSN": "Lookup SSN",
 	"subscription": "DB Subscription",
 	"manualSSN": "Manual SSN",

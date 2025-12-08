@@ -15,6 +15,7 @@ from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -725,3 +726,187 @@ async def cancel_rental(
             error=e.error_code or "CANCEL_ERROR",
             message=f"Failed to cancel: {e.message}"
         )
+
+
+# ============================================
+# SMS Code Endpoints (for Phone Lookup)
+# ============================================
+
+class PhoneRentalCheckCodeResponse(BaseModel):
+    """Response model for check code endpoint."""
+    success: bool
+    status: str  # pending, code_received, cancelled, expired, finished
+    sms_code: Optional[str] = None
+    message: Optional[str] = None
+
+
+class PhoneRentalFinishResponse(BaseModel):
+    """Response model for finish endpoint."""
+    success: bool
+    message: Optional[str] = None
+
+
+from pydantic import BaseModel
+
+
+@router.post("/rentals/{rental_id}/check-code", response_model=PhoneRentalCheckCodeResponse)
+async def check_rental_code(
+    rental_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_postgres_session),
+):
+    """
+    Check if SMS code has been received for a phone lookup rental.
+    """
+    # Find rental
+    try:
+        rental_uuid = UUID(rental_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid rental ID"
+        )
+
+    query = select(PhoneRental).where(
+        PhoneRental.id == rental_uuid,
+        PhoneRental.user_id == current_user.id,
+    )
+    result = await db.execute(query)
+    rental = result.scalar_one_or_none()
+
+    if not rental:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rental not found"
+        )
+
+    # If already has code, return it
+    if rental.sms_code:
+        return PhoneRentalCheckCodeResponse(
+            success=True,
+            status="code_received",
+            sms_code=rental.sms_code,
+            message="SMS code received"
+        )
+
+    # If not active, return current status
+    if rental.status != PhoneRentalStatus.active:
+        return PhoneRentalCheckCodeResponse(
+            success=True,
+            status=rental.status.value,
+            message=f"Rental is {rental.status.value}"
+        )
+
+    # Check if expired
+    if rental.expires_at and datetime.utcnow() > rental.expires_at:
+        rental.status = PhoneRentalStatus.expired
+        await db.commit()
+        return PhoneRentalCheckCodeResponse(
+            success=True,
+            status="expired",
+            message="Rental has expired"
+        )
+
+    # Poll DaisySMS for code
+    try:
+        async with create_daisysms_client() as daisysms:
+            daisysms_status, sms_code = await daisysms.get_status(rental.daisysms_id)
+
+            if daisysms_status == "STATUS_OK" and sms_code:
+                # Code received!
+                rental.sms_code = sms_code
+                await db.commit()
+
+                logger.info(
+                    f"Phone lookup SMS code received: user={current_user.username}, "
+                    f"rental={rental_id}, code={sms_code}"
+                )
+
+                return PhoneRentalCheckCodeResponse(
+                    success=True,
+                    status="code_received",
+                    sms_code=sms_code,
+                    message="SMS code received"
+                )
+
+            elif daisysms_status == "STATUS_CANCEL":
+                rental.status = PhoneRentalStatus.cancelled
+                await db.commit()
+                return PhoneRentalCheckCodeResponse(
+                    success=True,
+                    status="cancelled",
+                    message="Rental was cancelled"
+                )
+
+            else:
+                # Still waiting
+                return PhoneRentalCheckCodeResponse(
+                    success=True,
+                    status="pending",
+                    message="Waiting for SMS..."
+                )
+
+    except DaisySMSError as e:
+        logger.error(f"DaisySMS error checking code: {e}")
+        return PhoneRentalCheckCodeResponse(
+            success=False,
+            status="error",
+            message="Failed to check SMS status"
+        )
+
+
+@router.post("/rentals/{rental_id}/finish", response_model=PhoneRentalFinishResponse)
+async def finish_rental(
+    rental_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_postgres_session),
+):
+    """
+    Finish a phone rental (mark as complete, no refund).
+    """
+    # Find rental
+    try:
+        rental_uuid = UUID(rental_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid rental ID"
+        )
+
+    query = select(PhoneRental).where(
+        PhoneRental.id == rental_uuid,
+        PhoneRental.user_id == current_user.id,
+    )
+    result = await db.execute(query)
+    rental = result.scalar_one_or_none()
+
+    if not rental:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rental not found"
+        )
+
+    # Check if already finished
+    if rental.status in [PhoneRentalStatus.cancelled, PhoneRentalStatus.finished]:
+        return PhoneRentalFinishResponse(
+            success=True,
+            message=f"Rental is already {rental.status.value}"
+        )
+
+    # Finish in DaisySMS
+    try:
+        async with create_daisysms_client() as daisysms:
+            await daisysms.finish_number(rental.daisysms_id)
+    except DaisySMSError as e:
+        logger.warning(f"DaisySMS error finishing phone lookup rental: {e}")
+        # Continue anyway
+
+    rental.status = PhoneRentalStatus.finished
+    await db.commit()
+
+    logger.info(f"Phone lookup rental finished: user={current_user.username}, rental={rental_id}")
+
+    return PhoneRentalFinishResponse(
+        success=True,
+        message="Rental finished"
+    )
