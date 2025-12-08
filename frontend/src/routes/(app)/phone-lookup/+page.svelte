@@ -16,6 +16,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
 	import { Label } from '$lib/components/ui/label';
+	import { Input } from '$lib/components/ui/input';
 	import { toast } from 'svelte-sonner';
 	import Search from '@lucide/svelte/icons/search';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
@@ -37,6 +38,7 @@
 	let rentals = $state<PhoneRentalResponse[]>([]);
 	let isLoadingRentals = $state(false);
 	let searchQuery = $state('');
+	let isInputFocused = $state(false);
 
 	// Filtered services based on search query
 	const filteredServices = $derived(
@@ -175,34 +177,33 @@
 					<div class="space-y-2">
 						<Label for="service-search" class="text-sm font-medium">{$t('phone-lookup.selectService')} *</Label>
 						<div class="relative">
-							<input
+							<Input
 								id="service-search"
 								type="text"
 								bind:value={searchQuery}
 								placeholder={$t('phone-lookup.searchServices')}
-								class="w-full h-11 px-4 border rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
+								onfocus={() => isInputFocused = true}
+								onblur={() => setTimeout(() => isInputFocused = false, 200)}
 							/>
 						</div>
 
-						{#if searchQuery || selectedService}
-							<div class="border rounded-md max-h-64 overflow-y-auto">
+						{#if isInputFocused || selectedService}
+							<div class="border border-border rounded-md max-h-64 overflow-y-auto bg-popover">
 								{#each filteredServices as service}
 									<button
 										type="button"
-										class="w-full px-4 py-3 text-left hover:bg-muted transition-colors flex items-center justify-between border-b last:border-b-0 {selectedService ===
-										service.code
-											? 'bg-primary/10'
-											: ''}"
+										class="w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b last:border-b-0 bg-background hover:bg-accent hover:text-accent-foreground {selectedService === service.code ? 'bg-accent text-accent-foreground' : 'text-foreground'}"
 										onclick={() => {
 											selectedService = service.code;
 											searchQuery = service.name;
+											isInputFocused = false;
 										}}
 									>
 										<span class="font-medium">{service.name}</span>
 										<span class="text-xs text-muted-foreground">{service.code}</span>
 									</button>
 								{:else}
-									<div class="px-4 py-3 text-muted-foreground text-center">{$t('phone-lookup.noServicesFound')}</div>
+									<div class="px-4 py-3 text-center text-muted-foreground bg-background">{$t('phone-lookup.noServicesFound')}</div>
 								{/each}
 							</div>
 						{:else}
