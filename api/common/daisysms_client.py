@@ -6,6 +6,7 @@ API Documentation: https://daisysms.com/docs/api
 import os
 import logging
 import asyncio
+import json
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 import httpx
@@ -449,38 +450,42 @@ class DaisySMSClient:
             "country": country
         })
 
-        # Parse response (format: service_code:price,service_code:price,...)
-        # API may include metadata fields like "count:N" which should be skipped
-        METADATA_FIELDS = {"count", "total", "status", "error", "message"}
-
         services = []
-        skipped_fields = []
 
-        for item in response.split(","):
-            item = item.strip()
-            if ":" in item:
-                parts = item.split(":")
-                if len(parts) >= 2:
-                    code = parts[0].strip().lower()
+        # Parse JSON response
+        # Format: {"187": {"service_code": {"name": "...", "cost": "...", "count": N}, ...}}
+        # "187" is the country code for USA
+        try:
+            data = json.loads(response)
 
-                    # Skip metadata/service fields
-                    if code in METADATA_FIELDS:
-                        skipped_fields.append(code)
-                        continue
+            # Iterate over country codes in response
+            for country_code, country_services in data.items():
+                if isinstance(country_services, dict):
+                    for code, service_info in country_services.items():
+                        if isinstance(service_info, dict):
+                            # Get service name from API or fallback to our mapping
+                            name = service_info.get('name')
+                            if not name:
+                                name = SERVICE_CODE_TO_NAME.get(code, code.title())
 
-                    try:
-                        price = float(parts[1].strip())
-                    except ValueError:
-                        continue
+                            # Get price from 'cost' field
+                            cost = service_info.get('cost', '0')
+                            try:
+                                price = float(cost)
+                            except (ValueError, TypeError):
+                                price = 0.0
 
-                    services.append({
-                        "code": code,
-                        "name": SERVICE_CODE_TO_NAME.get(code, code.title()),
-                        "price": price
-                    })
+                            services.append({
+                                "code": code,
+                                "name": name,
+                                "price": price
+                            })
 
-        if skipped_fields:
-            logger.debug(f"Skipped metadata fields: {skipped_fields}")
+            logger.info(f"Parsed {len(services)} services from JSON response")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}. Raw response (first 500 chars): {response[:500]}")
+            return []
 
         # Log warning if no valid services after parsing
         if not services:
