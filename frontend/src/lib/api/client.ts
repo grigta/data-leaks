@@ -1314,6 +1314,7 @@ export const checkSubscriptionAccess = async (): Promise<CheckAccessResponse> =>
 // Database Lookup Types and API
 export interface LookupSearchRequest {
   firstname: string;
+  middlename?: string;
   lastname: string;
   street?: string;
   phone?: string;

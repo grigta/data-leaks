@@ -165,10 +165,11 @@
 			return;
 		}
 
-		// Parse fullname into firstname and lastname
+		// Parse fullname into firstname, middlename, and lastname
 		const nameParts = searchForm.fullname.trim().split(/\s+/);
 		const firstname = nameParts[0] || '';
-		const lastname = nameParts.slice(1).join(' ') || '';
+		const middlename = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : undefined;
+		const lastname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
 
 		if (!lastname) {
 			searchError = $t('subscription.lastnameRequired');
@@ -183,6 +184,7 @@
 		try {
 			const response = await searchDatabase({
 				firstname: firstname,
+				middlename: middlename,
 				lastname: lastname,
 				street: searchForm.address?.trim() || undefined
 			});

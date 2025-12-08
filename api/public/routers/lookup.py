@@ -27,6 +27,7 @@ router = APIRouter()
 # Pydantic models
 class LookupSearchRequest(BaseModel):
     firstname: str
+    middlename: Optional[str] = None
     lastname: str
     street: Optional[str] = None
     phone: Optional[str] = None
