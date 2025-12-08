@@ -31,6 +31,13 @@
 		DialogTitle
 	} from '$lib/components/ui/dialog';
 	import {
+		Select,
+		SelectContent,
+		SelectItem,
+		SelectTrigger,
+		SelectValue
+	} from '$lib/components/ui/select';
+	import {
 		Table,
 		TableBody,
 		TableCell,
@@ -38,13 +45,6 @@
 		TableHeader,
 		TableRow
 	} from '$lib/components/ui/table';
-	import {
-		Select,
-		SelectContent,
-		SelectItem,
-		SelectTrigger,
-		SelectValue
-	} from '$lib/components/ui/select';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import Check from '@lucide/svelte/icons/check';
 	import Clock from '@lucide/svelte/icons/clock';
@@ -136,6 +136,12 @@
 		selectedPlanId = planId;
 		errorMessage = '';
 		showConfirmDialog = true;
+	}
+
+	function handleSelectPlan(value: string | undefined) {
+		if (value) {
+			handlePurchaseClick(value);
+		}
 	}
 
 	async function handleConfirmPurchase() {
@@ -524,7 +530,26 @@
 		<!-- Section 3: Available Plans (for renewal reference) -->
 		<div class="mb-6">
 			<h2 class="text-2xl font-bold mb-2">{$t('subscription.availablePlans')}</h2>
-			<p class="text-muted-foreground">{$t('subscription.choosePlan')}</p>
+			<p class="text-muted-foreground mb-4">{$t('subscription.choosePlan')}</p>
+
+			<!-- Quick Plan Selector -->
+			<div class="max-w-xs">
+				<Select onSelectedChange={(v) => handleSelectPlan(v?.value)}>
+					<SelectTrigger>
+						<SelectValue placeholder={$t('subscription.selectPlan')} />
+					</SelectTrigger>
+					<SelectContent>
+						{#each plans as plan (plan.id)}
+							<SelectItem value={plan.id}>
+								{plan.name} - ${plan.renewal_discount_percent > 0 ? getRenewalPrice(plan).toFixed(2) : plan.price.toFixed(2)}
+								{#if plan.renewal_discount_percent > 0}
+									(-{plan.renewal_discount_percent}%)
+								{/if}
+							</SelectItem>
+						{/each}
+					</SelectContent>
+				</Select>
+			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -636,7 +661,26 @@
 		<!-- Subscription Plans -->
 		<div class="mb-6">
 			<h2 class="text-2xl font-bold mb-2">{$t('subscription.availablePlans')}</h2>
-			<p class="text-muted-foreground">{$t('subscription.choosePlan')}</p>
+			<p class="text-muted-foreground mb-4">{$t('subscription.choosePlan')}</p>
+
+			<!-- Quick Plan Selector -->
+			<div class="max-w-xs">
+				<Select onSelectedChange={(v) => handleSelectPlan(v?.value)}>
+					<SelectTrigger>
+						<SelectValue placeholder={$t('subscription.selectPlan')} />
+					</SelectTrigger>
+					<SelectContent>
+						{#each plans as plan (plan.id)}
+							<SelectItem value={plan.id}>
+								{plan.name} - ${plan.price.toFixed(2)}
+								{#if plan.discount_percent > 0}
+									(-{plan.discount_percent}%)
+								{/if}
+							</SelectItem>
+						{/each}
+					</SelectContent>
+				</Select>
+			</div>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -744,51 +788,25 @@
 				? getRenewalPrice(selectedPlan)
 				: selectedPlan.price}
 			<div class="py-4 space-y-4">
-				<!-- Plan Selector -->
-				<div class="space-y-2">
-					<Label>{$t('subscription.selectPlan')}</Label>
-					<Select
-						type="single"
-						value={{ value: selectedPlanId || '', label: selectedPlan.name }}
-						onValueChange={(v) => { if (v) selectedPlanId = v.value; }}
-					>
-						<SelectTrigger class="w-full">
-							<SelectValue placeholder={$t('subscription.selectPlan')} />
-						</SelectTrigger>
-						<SelectContent>
-							{#each plans as plan (plan.id)}
-								{@const planPrice = currentSubscription && plan.renewal_discount_percent > 0
-									? getRenewalPrice(plan)
-									: plan.price}
-								<SelectItem value={plan.id}>
-									<div class="flex justify-between items-center w-full gap-4">
-										<span>{plan.name}</span>
-										<span class="text-muted-foreground">
-											{#if currentSubscription && plan.renewal_discount_percent > 0}
-												<span class="line-through mr-1">${plan.price.toFixed(2)}</span>
-												<span class="text-green-600 font-medium">${planPrice.toFixed(2)}</span>
-											{:else}
-												${planPrice.toFixed(2)}
-											{/if}
-										</span>
-									</div>
-								</SelectItem>
-							{/each}
-						</SelectContent>
-					</Select>
-				</div>
-
-				<!-- Price Display -->
-				<div class="flex justify-between items-center p-4 bg-muted rounded-lg">
-					<span class="font-medium">{selectedPlan.name}</span>
-					<div class="text-right">
+				<!-- Plan Info -->
+				<div class="text-center p-4 bg-muted rounded-lg">
+					<p class="text-lg font-semibold mb-2">{selectedPlan.name}</p>
+					<div class="flex items-center justify-center gap-2">
 						{#if currentSubscription && selectedPlan.renewal_discount_percent > 0}
-							<span class="text-sm text-muted-foreground line-through mr-2">${selectedPlan.price.toFixed(2)}</span>
-							<span class="text-xl font-bold text-green-600">${chargePrice.toFixed(2)}</span>
+							<span class="text-muted-foreground line-through">${selectedPlan.price.toFixed(2)}</span>
+							<span class="text-3xl font-bold text-green-600">${chargePrice.toFixed(2)}</span>
 						{:else}
-							<span class="text-xl font-bold">${chargePrice.toFixed(2)}</span>
+							<span class="text-3xl font-bold text-primary">${chargePrice.toFixed(2)}</span>
 						{/if}
 					</div>
+					{#if currentSubscription && selectedPlan.renewal_discount_percent > 0}
+						<Badge variant="default" class="mt-2 bg-green-600">
+							{$t('subscription.renewalDiscount', { percent: selectedPlan.renewal_discount_percent })}
+						</Badge>
+					{/if}
+					<p class="text-sm text-muted-foreground mt-2">
+						{$t('subscription.monthsAccess', { months: selectedPlan.duration_months })}
+					</p>
 				</div>
 
 				{#if currentSubscription}
