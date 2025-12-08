@@ -69,5 +69,7 @@
 	"subscriptionActivatedDesc": "Ваша подписка {{planName}} теперь активна.",
 	"renewalSuccess": "Подписка успешно продлена!",
 	"subscriptionExtended": "Подписка продлена!",
-	"subscriptionExtendedDesc": "Ваша подписка продлена до {{endDate}}."
+	"subscriptionExtendedDesc": "Ваша подписка продлена до {{endDate}}.",
+	"renewalDiscount": "Скидка на продление {{percent}}%",
+	"extendsUntil": "Продлится до {{date}}"
 }

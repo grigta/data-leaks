@@ -1273,6 +1273,7 @@ export interface SubscriptionPlanResponse {
   duration_months: number;
   price: number;
   discount_percent: number;
+  renewal_discount_percent: number;
 }
 
 export interface SubscriptionResponse {

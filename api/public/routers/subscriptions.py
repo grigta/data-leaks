@@ -26,6 +26,7 @@ class SubscriptionPlanResponse(BaseModel):
     duration_months: int
     price: float
     discount_percent: int
+    renewal_discount_percent: int
 
     class Config:
         from_attributes = True
@@ -101,17 +102,23 @@ async def purchase_subscription(
     )
     existing_subscription = result.scalar_one_or_none()
 
+    # Calculate price (apply renewal discount if extending)
+    price_to_charge = float(plan.price)
+    if existing_subscription and plan.renewal_discount_percent > 0:
+        discount = price_to_charge * plan.renewal_discount_percent / 100
+        price_to_charge = round(price_to_charge - discount, 2)
+
     # Check user balance
-    if current_user.balance < plan.price:
+    if current_user.balance < price_to_charge:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient balance. Required: ${plan.price}, Available: ${current_user.balance}"
+            detail=f"Insufficient balance. Required: ${price_to_charge}, Available: ${current_user.balance}"
         )
 
     # Create or extend subscription in a transaction
     try:
         # Deduct balance
-        current_user.balance -= plan.price
+        current_user.balance -= price_to_charge
 
         # Calculate dates
         if existing_subscription:

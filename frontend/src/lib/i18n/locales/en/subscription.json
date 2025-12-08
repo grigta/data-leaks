@@ -69,5 +69,7 @@
 	"subscriptionActivatedDesc": "Your {{planName}} subscription is now active.",
 	"renewalSuccess": "Subscription renewed successfully!",
 	"subscriptionExtended": "Subscription extended!",
-	"subscriptionExtendedDesc": "Your subscription has been extended until {{endDate}}."
+	"subscriptionExtendedDesc": "Your subscription has been extended until {{endDate}}.",
+	"renewalDiscount": "Renewal discount {{percent}}%",
+	"extendsUntil": "Extends until {{date}}"
 }

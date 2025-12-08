@@ -252,6 +252,19 @@
 		return plan.duration_months === 12;
 	}
 
+	function getNewEndDate(plan: SubscriptionPlanResponse): string {
+		if (!currentSubscription) return '';
+		const currentEnd = new Date(currentSubscription.end_date);
+		const newEnd = new Date(currentEnd.getTime() + plan.duration_months * 30 * 24 * 60 * 60 * 1000);
+		return formatDate(newEnd.toISOString());
+	}
+
+	function getRenewalPrice(plan: SubscriptionPlanResponse): number {
+		if (!currentSubscription || plan.renewal_discount_percent === 0) return plan.price;
+		const discount = plan.price * plan.renewal_discount_percent / 100;
+		return Math.round((plan.price - discount) * 100) / 100;
+	}
+
 	function formatPhones(phones: any[]): string {
 		if (!phones || phones.length === 0) return '-';
 		return phones.map(p => typeof p === 'string' ? p : p.phone || p.number || JSON.stringify(p)).join(', ');
@@ -525,7 +538,12 @@
 
 					<CardHeader class="text-center pb-2">
 						<CardTitle class="text-xl">{plan.name}</CardTitle>
-						{#if plan.discount_percent > 0}
+						{#if plan.renewal_discount_percent > 0}
+							<Badge variant="default" class="w-fit mx-auto mt-1 bg-green-600">
+								<Sparkles class="h-3 w-3 mr-1" />
+								{$t('subscription.renewalDiscount', { percent: plan.renewal_discount_percent })}
+							</Badge>
+						{:else if plan.discount_percent > 0}
 							<Badge variant="secondary" class="w-fit mx-auto mt-1">
 								<Sparkles class="h-3 w-3 mr-1" />
 								{$t('subscription.save', { percent: plan.discount_percent })}
@@ -535,14 +553,24 @@
 
 					<CardContent class="text-center pb-4">
 						<div class="mb-4">
-							{#if plan.discount_percent > 0}
+							{#if plan.renewal_discount_percent > 0}
 								<p class="text-sm text-muted-foreground line-through">
-									${getOriginalPrice(plan).toFixed(2)}
+									${plan.price.toFixed(2)}
 								</p>
+								<p class="text-4xl font-bold text-green-600">${getRenewalPrice(plan).toFixed(2)}</p>
+							{:else}
+								{#if plan.discount_percent > 0}
+									<p class="text-sm text-muted-foreground line-through">
+										${getOriginalPrice(plan).toFixed(2)}
+									</p>
+								{/if}
+								<p class="text-4xl font-bold text-primary">${plan.price.toFixed(2)}</p>
 							{/if}
-							<p class="text-4xl font-bold text-primary">${plan.price.toFixed(2)}</p>
 							<p class="text-sm text-muted-foreground">
 								${getPricePerMonth(plan).toFixed(2)}{$t('subscription.perMonth')}
+							</p>
+							<p class="text-sm text-green-600 font-medium mt-2">
+								{$t('subscription.extendsUntil', { date: getNewEndDate(plan) })}
 							</p>
 						</div>
 
@@ -705,18 +733,35 @@
 		</DialogHeader>
 
 		{#if selectedPlan}
+			{@const chargePrice = currentSubscription && selectedPlan.renewal_discount_percent > 0
+				? getRenewalPrice(selectedPlan)
+				: selectedPlan.price}
 			<div class="py-4 space-y-4">
 				<div class="flex justify-between items-center p-4 bg-muted rounded-lg">
 					<span class="font-medium">{selectedPlan.name}</span>
-					<span class="text-xl font-bold">${selectedPlan.price.toFixed(2)}</span>
+					<div class="text-right">
+						{#if currentSubscription && selectedPlan.renewal_discount_percent > 0}
+							<span class="text-sm text-muted-foreground line-through mr-2">${selectedPlan.price.toFixed(2)}</span>
+							<span class="text-xl font-bold text-green-600">${chargePrice.toFixed(2)}</span>
+						{:else}
+							<span class="text-xl font-bold">${chargePrice.toFixed(2)}</span>
+						{/if}
+					</div>
 				</div>
+
+				{#if currentSubscription}
+					<div class="flex justify-between items-center text-sm">
+						<span class="text-muted-foreground">{$t('subscription.extendsUntil', { date: '' }).replace(': ', '')}</span>
+						<span class="font-medium text-green-600">{getNewEndDate(selectedPlan)}</span>
+					</div>
+				{/if}
 
 				<div class="flex justify-between items-center text-sm">
 					<span class="text-muted-foreground">{$t('subscription.yourBalance')}:</span>
 					<span class="font-medium">{formatCurrency($user?.balance ?? 0)}</span>
 				</div>
 
-				{#if ($user?.balance ?? 0) < selectedPlan.price}
+				{#if ($user?.balance ?? 0) < chargePrice}
 					<Alert variant="destructive">
 						<AlertCircle class="h-4 w-4" />
 						<AlertDescription>
@@ -740,7 +785,7 @@
 			</Button>
 			<Button
 				onclick={handleConfirmPurchase}
-				disabled={isPurchasing || !selectedPlan || ($user?.balance ?? 0) < (selectedPlan?.price ?? 0)}
+				disabled={isPurchasing || !selectedPlan || ($user?.balance ?? 0) < (currentSubscription && selectedPlan?.renewal_discount_percent > 0 ? getRenewalPrice(selectedPlan) : selectedPlan?.price ?? 0)}
 			>
 				{#if isPurchasing}
 					<Loader2 class="h-4 w-4 mr-2 animate-spin" />
