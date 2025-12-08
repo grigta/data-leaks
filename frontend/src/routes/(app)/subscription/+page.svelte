@@ -30,14 +30,7 @@
 		DialogHeader,
 		DialogTitle
 	} from '$lib/components/ui/dialog';
-	import {
-		Select,
-		SelectContent,
-		SelectItem,
-		SelectTrigger,
-		SelectValue
-	} from '$lib/components/ui/select';
-	import {
+		import {
 		Table,
 		TableBody,
 		TableCell,
@@ -132,12 +125,6 @@
 		selectedPlanId = planId;
 		errorMessage = '';
 		showConfirmDialog = true;
-	}
-
-	function handleSelectPlan(value: string | undefined) {
-		if (value) {
-			handlePurchaseClick(value);
-		}
 	}
 
 	async function handleConfirmPurchase() {
@@ -492,26 +479,7 @@
 		<!-- Section 3: Available Plans (for renewal reference) -->
 		<div class="mb-6">
 			<h2 class="text-2xl font-bold mb-2">{$t('subscription.availablePlans')}</h2>
-			<p class="text-muted-foreground mb-4">{$t('subscription.choosePlan')}</p>
-
-			<!-- Quick Plan Selector -->
-			<div class="max-w-xs">
-				<Select onSelectedChange={(v) => handleSelectPlan(v?.value)}>
-					<SelectTrigger>
-						<SelectValue placeholder={$t('subscription.selectPlan')} />
-					</SelectTrigger>
-					<SelectContent>
-						{#each plans as plan (plan.id)}
-							<SelectItem value={plan.id}>
-								{plan.name} - ${plan.renewal_discount_percent > 0 ? getRenewalPrice(plan).toFixed(2) : plan.price.toFixed(2)}
-								{#if plan.renewal_discount_percent > 0}
-									(-{plan.renewal_discount_percent}%)
-								{/if}
-							</SelectItem>
-						{/each}
-					</SelectContent>
-				</Select>
-			</div>
+			<p class="text-muted-foreground">{$t('subscription.choosePlan')}</p>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -623,26 +591,7 @@
 		<!-- Subscription Plans -->
 		<div class="mb-6">
 			<h2 class="text-2xl font-bold mb-2">{$t('subscription.availablePlans')}</h2>
-			<p class="text-muted-foreground mb-4">{$t('subscription.choosePlan')}</p>
-
-			<!-- Quick Plan Selector -->
-			<div class="max-w-xs">
-				<Select onSelectedChange={(v) => handleSelectPlan(v?.value)}>
-					<SelectTrigger>
-						<SelectValue placeholder={$t('subscription.selectPlan')} />
-					</SelectTrigger>
-					<SelectContent>
-						{#each plans as plan (plan.id)}
-							<SelectItem value={plan.id}>
-								{plan.name} - ${plan.price.toFixed(2)}
-								{#if plan.discount_percent > 0}
-									(-{plan.discount_percent}%)
-								{/if}
-							</SelectItem>
-						{/each}
-					</SelectContent>
-				</Select>
-			</div>
+			<p class="text-muted-foreground">{$t('subscription.choosePlan')}</p>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
