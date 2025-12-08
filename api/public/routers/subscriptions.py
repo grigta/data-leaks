@@ -101,12 +101,6 @@ async def purchase_subscription(
     )
     existing_subscription = result.scalar_one_or_none()
 
-    if existing_subscription:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have an active subscription. Please wait for it to expire before purchasing a new one."
-        )
-
     # Check user balance
     if current_user.balance < plan.price:
         raise HTTPException(
@@ -114,25 +108,35 @@ async def purchase_subscription(
             detail=f"Insufficient balance. Required: ${plan.price}, Available: ${current_user.balance}"
         )
 
-    # Create subscription in a transaction
+    # Create or extend subscription in a transaction
     try:
         # Deduct balance
         current_user.balance -= plan.price
 
         # Calculate dates
-        start_date = datetime.utcnow()
-        end_date = start_date + timedelta(days=plan.duration_months * 30)
+        if existing_subscription:
+            # Extend existing subscription: add duration to current end_date
+            start_date = existing_subscription.start_date
+            end_date = existing_subscription.end_date + timedelta(days=plan.duration_months * 30)
 
-        # Create subscription
-        subscription = Subscription(
-            user_id=current_user.id,
-            plan_id=plan.id,
-            start_date=start_date,
-            end_date=end_date,
-            is_active=True
-        )
+            # Update existing subscription
+            existing_subscription.end_date = end_date
+            existing_subscription.plan_id = plan.id  # Update to new plan if different
+            subscription = existing_subscription
+        else:
+            # Create new subscription
+            start_date = datetime.utcnow()
+            end_date = start_date + timedelta(days=plan.duration_months * 30)
 
-        db.add(subscription)
+            subscription = Subscription(
+                user_id=current_user.id,
+                plan_id=plan.id,
+                start_date=start_date,
+                end_date=end_date,
+                is_active=True
+            )
+            db.add(subscription)
+
         await db.commit()
         await db.refresh(subscription)
 

@@ -11,6 +11,7 @@
 		handleApiError
 	} from '$lib/api/client';
 	import { refreshUser } from '$lib/stores/auth';
+	import { t } from '$lib/i18n';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
@@ -78,7 +79,7 @@
 
 	async function handleSearch() {
 		if (!selectedService) {
-			errorMessage = 'Please select a service';
+			errorMessage = $t('phone-lookup.selectService');
 			return;
 		}
 
@@ -105,7 +106,7 @@
 				searchQuery = '';
 			} else {
 				// Show error
-				errorMessage = response.message || 'Search failed';
+				errorMessage = response.message || $t('phone-lookup.errorNoMatches');
 			}
 		} catch (error: any) {
 			console.error('[PHONE-LOOKUP] Search error:', error);
@@ -124,6 +125,10 @@
 		loadServices();
 	});
 </script>
+
+<svelte:head>
+	<title>{$t('phone-lookup.title')}</title>
+</svelte:head>
 
 <PhoneLookupResultModal
 	open={showResultModal}
@@ -154,7 +159,7 @@
 			<CardHeader class="text-center">
 				<CardTitle class="text-2xl flex items-center justify-center gap-2">
 					<Phone class="h-6 w-6" />
-					Phone Lookup
+					{$t('phone-lookup.title')}
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
@@ -168,13 +173,13 @@
 				<div class="space-y-6">
 					<!-- Service Selection -->
 					<div class="space-y-2">
-						<Label for="service-search" class="text-sm font-medium">Select Service *</Label>
+						<Label for="service-search" class="text-sm font-medium">{$t('phone-lookup.selectService')} *</Label>
 						<div class="relative">
 							<input
 								id="service-search"
 								type="text"
 								bind:value={searchQuery}
-								placeholder="Search services..."
+								placeholder={$t('phone-lookup.searchServices')}
 								class="w-full h-11 px-4 border rounded-md text-base focus:outline-none focus:ring-2 focus:ring-primary"
 							/>
 						</div>
@@ -197,12 +202,12 @@
 										<span class="text-xs text-muted-foreground">{service.code}</span>
 									</button>
 								{:else}
-									<div class="px-4 py-3 text-muted-foreground text-center">No services found</div>
+									<div class="px-4 py-3 text-muted-foreground text-center">{$t('phone-lookup.noServicesFound')}</div>
 								{/each}
 							</div>
 						{:else}
 							<p class="text-sm text-muted-foreground">
-								Type to search among {services.length} available services
+								{$t('phone-lookup.typeToSearch', { count: services.length })}
 							</p>
 						{/if}
 					</div>
@@ -210,11 +215,10 @@
 					<!-- Info -->
 					<div class="bg-muted/50 rounded-lg p-4 space-y-2">
 						<p class="text-sm">
-							<strong>Cost:</strong> $3.00 per lookup (charged only if SSN is found)
+							<strong>{$t('phone-lookup.cost')}:</strong> {$t('phone-lookup.costDescription')}
 						</p>
 						<p class="text-xs text-muted-foreground">
-							Select a service to get a phone number. The number will be searched in our database
-							to find associated personal information including SSN.
+							{$t('phone-lookup.costHint')}
 						</p>
 					</div>
 
@@ -228,16 +232,16 @@
 						>
 							{#if isSearching}
 								<Loader2 class="mr-2 h-5 w-5 animate-spin" />
-								Searching...
+								{$t('phone-lookup.searching')}
 							{:else}
 								<Search class="mr-2 h-5 w-5" />
-								Search
+								{$t('phone-lookup.search')}
 							{/if}
 						</Button>
 
 						<Button variant="outline" size="lg" class="min-w-[200px]" onclick={openHistory}>
 							<History class="mr-2 h-5 w-5" />
-							View History
+							{$t('phone-lookup.viewHistory')}
 						</Button>
 					</div>
 				</div>

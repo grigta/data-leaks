@@ -20,6 +20,7 @@ const config: Config = {
 		'/manual-ssn': ['common', 'navigation', 'search'],
 		'/subscription': ['common', 'navigation', 'subscription'],
 		'/lookup-ssn': ['common', 'navigation', 'subscription'],
+		'/phone-lookup': ['common', 'navigation', 'phone-lookup'],
 		// Дефолтный маппинг для всех необработанных маршрутов
 		'*': ['common', 'navigation']
 	},
@@ -100,6 +101,11 @@ const config: Config = {
 			loader: async () => (await import('./locales/en/subscription.json')).default
 		},
 		{
+			locale: 'en',
+			key: 'phone-lookup',
+			loader: async () => (await import('./locales/en/phone-lookup.json')).default
+		},
+		{
 			locale: 'ru',
 			key: 'common',
 			loader: async () => (await import('./locales/ru/common.json')).default
@@ -168,6 +174,16 @@ const config: Config = {
 			locale: 'ru',
 			key: 'contact',
 			loader: async () => (await import('./locales/ru/contact.json')).default
+		},
+		{
+			locale: 'ru',
+			key: 'subscription',
+			loader: async () => (await import('./locales/ru/subscription.json')).default
+		},
+		{
+			locale: 'ru',
+			key: 'phone-lookup',
+			loader: async () => (await import('./locales/ru/phone-lookup.json')).default
 		}
 	],
 	log: {

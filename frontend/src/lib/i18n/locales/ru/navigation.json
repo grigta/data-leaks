@@ -1,7 +1,9 @@
 {
 	"dashboard": "Панель",
 	"instantSSN": "Поиск SSN",
-	"phoneLookup": "Phone Lookup",
+	"phoneLookup": "Поиск по телефону",
+	"subscription": "Подписка на БД",
+	"lookupSSN": "Поиск SSN",
 	"manualSSN": "Ручной SSN",
 	"orders": "Заказы",
 	"cart": "Корзина",

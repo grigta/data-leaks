@@ -1310,4 +1310,54 @@ export const checkSubscriptionAccess = async (): Promise<CheckAccessResponse> =>
   return response.data;
 };
 
+// Database Lookup Types and API
+export interface LookupSearchRequest {
+  firstname: string;
+  lastname: string;
+  street?: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+}
+
+export interface LookupSearchMatch {
+  firstname?: string;
+  middlename?: string;
+  lastname?: string;
+  ssn?: string;
+  dob?: string;
+  age?: number;
+  gender?: string;
+  phones?: any[];
+  emails?: any[];
+  addresses?: any[];
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  matched_by?: string;
+}
+
+export interface LookupSearchResponse {
+  database_matches: LookupSearchMatch[];
+  search_metadata: {
+    search_timestamp: string;
+    database_matches_count: number;
+    user_id?: string;
+    search_params?: {
+      firstname: string;
+      lastname: string;
+      street?: string;
+      city?: string;
+      state?: string;
+      phone?: string;
+    };
+  };
+}
+
+export const searchDatabase = async (request: LookupSearchRequest): Promise<LookupSearchResponse> => {
+  const response = await apiClient.post<LookupSearchResponse>('/lookup/search', request);
+  return response.data;
+};
+
 export default apiClient;
