@@ -38,6 +38,13 @@
 		TableHeader,
 		TableRow
 	} from '$lib/components/ui/table';
+	import {
+		Select,
+		SelectContent,
+		SelectItem,
+		SelectTrigger,
+		SelectValue
+	} from '$lib/components/ui/select';
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import Check from '@lucide/svelte/icons/check';
 	import Clock from '@lucide/svelte/icons/clock';
@@ -724,7 +731,7 @@
 
 <!-- Confirm Purchase Dialog -->
 <Dialog bind:open={showConfirmDialog}>
-	<DialogContent>
+	<DialogContent class="sm:max-w-md">
 		<DialogHeader>
 			<DialogTitle>{$t('subscription.confirmPurchase')}</DialogTitle>
 			<DialogDescription>
@@ -737,6 +744,41 @@
 				? getRenewalPrice(selectedPlan)
 				: selectedPlan.price}
 			<div class="py-4 space-y-4">
+				<!-- Plan Selector -->
+				<div class="space-y-2">
+					<Label>{$t('subscription.selectPlan')}</Label>
+					<Select
+						type="single"
+						value={{ value: selectedPlanId || '', label: selectedPlan.name }}
+						onValueChange={(v) => { if (v) selectedPlanId = v.value; }}
+					>
+						<SelectTrigger class="w-full">
+							<SelectValue placeholder={$t('subscription.selectPlan')} />
+						</SelectTrigger>
+						<SelectContent>
+							{#each plans as plan (plan.id)}
+								{@const planPrice = currentSubscription && plan.renewal_discount_percent > 0
+									? getRenewalPrice(plan)
+									: plan.price}
+								<SelectItem value={plan.id}>
+									<div class="flex justify-between items-center w-full gap-4">
+										<span>{plan.name}</span>
+										<span class="text-muted-foreground">
+											{#if currentSubscription && plan.renewal_discount_percent > 0}
+												<span class="line-through mr-1">${plan.price.toFixed(2)}</span>
+												<span class="text-green-600 font-medium">${planPrice.toFixed(2)}</span>
+											{:else}
+												${planPrice.toFixed(2)}
+											{/if}
+										</span>
+									</div>
+								</SelectItem>
+							{/each}
+						</SelectContent>
+					</Select>
+				</div>
+
+				<!-- Price Display -->
 				<div class="flex justify-between items-center p-4 bg-muted rounded-lg">
 					<span class="font-medium">{selectedPlan.name}</span>
 					<div class="text-right">

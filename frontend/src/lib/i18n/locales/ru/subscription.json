@@ -71,5 +71,6 @@
 	"subscriptionExtended": "Подписка продлена!",
 	"subscriptionExtendedDesc": "Ваша подписка продлена до {{endDate}}.",
 	"renewalDiscount": "Скидка на продление {{percent}}%",
-	"extendsUntil": "Продлится до {{date}}"
+	"extendsUntil": "Продлится до {{date}}",
+	"selectPlan": "Выберите план"
 }
