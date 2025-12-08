@@ -253,8 +253,9 @@ jobs:
           cd /root/soft
           git pull origin main
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker-compose pull
-          docker-compose up -d --remove-orphans
+          docker compose pull
+          docker compose down --remove-orphans
+          docker compose up -d
           sleep 10
           docker image prune -af --filter "until=168h"
           echo "Deploy completed!"
