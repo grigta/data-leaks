@@ -68,13 +68,9 @@
 	let successMessage = $state('');
 
 	// Search state
-	let searchForm = $state<LookupSearchRequest>({
-		firstname: '',
-		lastname: '',
-		street: '',
-		phone: '',
-		city: '',
-		state: ''
+	let searchForm = $state({
+		fullname: '',
+		address: ''
 	});
 	let searchResults = $state<LookupSearchMatch[]>([]);
 	let isSearching = $state(false);
@@ -176,12 +172,18 @@
 	}
 
 	async function handleSearch() {
-		// Validate required fields
-		if (!searchForm.firstname.trim()) {
-			searchError = $t('subscription.firstnameRequired');
+		// Validate required field
+		if (!searchForm.fullname.trim()) {
+			searchError = $t('subscription.fullnameRequired');
 			return;
 		}
-		if (!searchForm.lastname.trim()) {
+
+		// Parse fullname into firstname and lastname
+		const nameParts = searchForm.fullname.trim().split(/\s+/);
+		const firstname = nameParts[0] || '';
+		const lastname = nameParts.slice(1).join(' ') || '';
+
+		if (!lastname) {
 			searchError = $t('subscription.lastnameRequired');
 			return;
 		}
@@ -193,12 +195,9 @@
 
 		try {
 			const response = await searchDatabase({
-				firstname: searchForm.firstname.trim(),
-				lastname: searchForm.lastname.trim(),
-				street: searchForm.street?.trim() || undefined,
-				phone: searchForm.phone?.trim() || undefined,
-				city: searchForm.city?.trim() || undefined,
-				state: searchForm.state?.trim() || undefined
+				firstname: firstname,
+				lastname: lastname,
+				street: searchForm.address?.trim() || undefined
 			});
 			searchResults = response.database_matches;
 		} catch (error: any) {
@@ -217,12 +216,8 @@
 
 	function clearSearchForm() {
 		searchForm = {
-			firstname: '',
-			lastname: '',
-			street: '',
-			phone: '',
-			city: '',
-			state: ''
+			fullname: '',
+			address: ''
 		};
 		searchResults = [];
 		searchError = '';
@@ -396,54 +391,21 @@
 			</CardHeader>
 			<CardContent>
 				<!-- Search Form -->
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
 					<div class="space-y-2">
-						<Label for="firstname">{$t('subscription.firstname')} *</Label>
+						<Label for="fullname">{$t('subscription.fullname')} *</Label>
 						<Input
-							id="firstname"
-							bind:value={searchForm.firstname}
-							placeholder={$t('subscription.firstname')}
+							id="fullname"
+							bind:value={searchForm.fullname}
+							placeholder={$t('subscription.fullnamePlaceholder')}
 						/>
 					</div>
 					<div class="space-y-2">
-						<Label for="lastname">{$t('subscription.lastname')} *</Label>
+						<Label for="address">{$t('subscription.address')}</Label>
 						<Input
-							id="lastname"
-							bind:value={searchForm.lastname}
-							placeholder={$t('subscription.lastname')}
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label for="street">{$t('subscription.street')}</Label>
-						<Input
-							id="street"
-							bind:value={searchForm.street}
-							placeholder={$t('subscription.street')}
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label for="phone">{$t('subscription.phone')}</Label>
-						<Input
-							id="phone"
-							bind:value={searchForm.phone}
-							placeholder={$t('subscription.phone')}
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label for="city">{$t('subscription.city')}</Label>
-						<Input
-							id="city"
-							bind:value={searchForm.city}
-							placeholder={$t('subscription.city')}
-						/>
-					</div>
-					<div class="space-y-2">
-						<Label for="state">{$t('subscription.state')}</Label>
-						<Input
-							id="state"
-							bind:value={searchForm.state}
-							placeholder={$t('subscription.state')}
-							maxlength={2}
+							id="address"
+							bind:value={searchForm.address}
+							placeholder={$t('subscription.addressPlaceholder')}
 						/>
 					</div>
 				</div>
