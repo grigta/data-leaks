@@ -12,5 +12,7 @@ from api.public.routers.tickets import router as tickets_router
 from api.public.routers.internal import router as internal_router
 from api.public.routers.maintenance import router as maintenance_router
 from api.public.routers.admin import router as admin_router
+from api.public.routers.phone_lookup import router as phone_lookup_router
+from api.public.routers.subscriptions import router as subscriptions_router
 
-__all__ = ["auth_router", "search_router", "ecommerce_router", "stats_router", "enrichment_router", "billing_router", "news_router", "tickets_router", "internal_router", "maintenance_router", "admin_router"]
+__all__ = ["auth_router", "search_router", "ecommerce_router", "stats_router", "enrichment_router", "billing_router", "news_router", "tickets_router", "internal_router", "maintenance_router", "admin_router", "phone_lookup_router", "subscriptions_router"]

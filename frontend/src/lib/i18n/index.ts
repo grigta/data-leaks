@@ -18,6 +18,8 @@ const config: Config = {
 		'/support': ['common', 'navigation', 'support'],
 		'/contact': ['common', 'navigation', 'contact'],
 		'/manual-ssn': ['common', 'navigation', 'search'],
+		'/subscription': ['common', 'navigation', 'subscription'],
+		'/lookup-ssn': ['common', 'navigation', 'subscription'],
 		// Дефолтный маппинг для всех необработанных маршрутов
 		'*': ['common', 'navigation']
 	},
@@ -91,6 +93,11 @@ const config: Config = {
 			locale: 'en',
 			key: 'contact',
 			loader: async () => (await import('./locales/en/contact.json')).default
+		},
+		{
+			locale: 'en',
+			key: 'subscription',
+			loader: async () => (await import('./locales/en/subscription.json')).default
 		},
 		{
 			locale: 'ru',

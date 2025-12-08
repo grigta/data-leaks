@@ -29,6 +29,15 @@ class OrderType(enum.Enum):
     reverse_ssn = "reverse_ssn"  # DEPRECATED: Used only for historical orders, new searches disabled
     instant_ssn = "instant_ssn"  # Instant SSN search via SearchBug API
     manual_ssn = "manual_ssn"    # Manual SSN ticket processed by worker
+    phone_lookup = "phone_lookup"  # Phone lookup via DaisySMS + SearchBug
+
+
+class PhoneRentalStatus(enum.Enum):
+    """Phone rental status enumeration."""
+    active = "active"      # Rental is active
+    expired = "expired"    # Rental has expired
+    cancelled = "cancelled"  # Rental was cancelled (refunded)
+    finished = "finished"  # Rental was finished (not refunded)
 
 
 class TransactionStatus(enum.Enum):
@@ -153,6 +162,9 @@ class User(Base):
     assigned_tickets: Mapped[List["ManualSSNTicket"]] = relationship(back_populates="worker", foreign_keys="[ManualSSNTicket.worker_id]")
     telegram_chats: Mapped[List["TelegramChat"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     abuse_tracking: Mapped[List["InstantSSNAbuseTracking"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    phone_rentals: Mapped[List["PhoneRental"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    phone_lookup_searches: Mapped[List["PhoneLookupSearch"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    subscriptions: Mapped[List["Subscription"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     support_threads: Mapped[List["SupportThread"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     support_messages: Mapped[List["SupportMessage"]] = relationship(back_populates="user", foreign_keys="[SupportMessage.user_id]", cascade="all, delete-orphan")
     contact_threads: Mapped[List["ContactThread"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -728,3 +740,127 @@ class CustomPricing(Base):
         Index('idx_custom_pricing_service_name', 'service_name'),
         Index('idx_custom_pricing_is_active', 'is_active'),
     )
+
+
+class PhoneRental(Base):
+    """Phone rental model for tracking DaisySMS phone number rentals."""
+    __tablename__ = "phone_rentals"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    daisysms_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    service_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    service_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[PhoneRentalStatus] = mapped_column(Enum(PhoneRentalStatus), default=PhoneRentalStatus.active, nullable=False)
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Search results (JSON)
+    searchbug_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    ssn_found: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    ssn_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # Order reference
+    order_id: Mapped[Optional[UUID]] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('orders.id', ondelete='SET NULL'), nullable=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    renewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="phone_rentals")
+    order: Mapped[Optional["Order"]] = relationship()
+
+    # Table constraints
+    __table_args__ = (
+        Index('idx_phone_rentals_user_id', 'user_id'),
+        Index('idx_phone_rentals_daisysms_id', 'daisysms_id'),
+        Index('idx_phone_rentals_status', 'status'),
+        Index('idx_phone_rentals_created_at', 'created_at'),
+        Index('idx_phone_rentals_service_code', 'service_code'),
+    )
+
+
+class PhoneLookupSearch(Base):
+    """Phone lookup search log model for tracking all search attempts."""
+    __tablename__ = "phone_lookup_searches"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    rental_id: Mapped[Optional[UUID]] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('phone_rentals.id', ondelete='SET NULL'), nullable=True)
+    service_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    ssn_found: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    order_id: Mapped[Optional[UUID]] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('orders.id', ondelete='SET NULL'), nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_charged: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal('0.00'), nullable=False)
+    source: Mapped[RequestSource] = mapped_column(Enum(RequestSource), default=RequestSource.web, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="phone_lookup_searches")
+    rental: Mapped[Optional["PhoneRental"]] = relationship()
+
+    # Table constraints
+    __table_args__ = (
+        CheckConstraint('user_charged >= 0', name='check_phone_lookup_user_charged_non_negative'),
+        Index('idx_phone_lookup_searches_user_id', 'user_id'),
+        Index('idx_phone_lookup_searches_rental_id', 'rental_id'),
+        Index('idx_phone_lookup_searches_service_code', 'service_code'),
+        Index('idx_phone_lookup_searches_created_at', 'created_at'),
+        Index('idx_phone_lookup_searches_ssn_found', 'ssn_found'),
+    )
+
+
+class SubscriptionPlan(Base):
+    """Subscription plan model for lookup API access."""
+    __tablename__ = "subscription_plans"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    duration_months: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    discount_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    subscriptions: Mapped[List["Subscription"]] = relationship(back_populates="plan")
+
+    # Table constraints
+    __table_args__ = (
+        Index('idx_subscription_plans_is_active', 'is_active'),
+        Index('idx_subscription_plans_duration', 'duration_months'),
+    )
+
+
+class Subscription(Base):
+    """Subscription model for user subscriptions to lookup API."""
+    __tablename__ = "subscriptions"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    plan_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('subscription_plans.id', ondelete='CASCADE'), nullable=False)
+    start_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="subscriptions")
+    plan: Mapped["SubscriptionPlan"] = relationship(back_populates="subscriptions")
+
+    # Table constraints
+    __table_args__ = (
+        CheckConstraint('end_date > start_date', name='check_end_date_after_start'),
+        Index('idx_subscriptions_user_id', 'user_id'),
+        Index('idx_subscriptions_is_active', 'is_active'),
+        Index('idx_subscriptions_end_date', 'end_date'),
+        Index('idx_subscriptions_user_active', 'user_id', 'is_active'),
+    )
+
+    def is_valid(self) -> bool:
+        """Check if subscription is currently valid."""
+        return self.is_active and self.end_date > datetime.utcnow()

@@ -1149,6 +1149,104 @@ export const getContactMessageDetails = async (message_id: string): Promise<any>
   return response.data;
 };
 
+// Phone Lookup Interfaces
+export interface DaisySMSService {
+  code: string;
+  name: string;
+  price?: number;
+  category?: string;
+}
+
+export interface DaisySMSServicesResponse {
+  services: DaisySMSService[];
+}
+
+export interface PhoneLookupResult {
+  firstname?: string;
+  lastname?: string;
+  middlename?: string;
+  dob?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  phone?: string;
+  email?: string;
+  ssn?: string;
+  ssn_found: boolean;
+}
+
+export interface PhoneLookupResponse {
+  success: boolean;
+  phone_number?: string;
+  rental_id?: string;
+  daisysms_id?: string;
+  person_data?: PhoneLookupResult;
+  error?: string;
+  message?: string;
+  new_balance?: number;
+  charged_amount?: number;
+  order_id?: string;
+}
+
+export interface PhoneRentalResponse {
+  id: string;
+  daisysms_id: string;
+  phone_number: string;
+  service_code: string;
+  service_name: string;
+  status: 'active' | 'expired' | 'cancelled' | 'finished';
+  auto_renew: boolean;
+  ssn_found: boolean;
+  person_data?: PhoneLookupResult;
+  created_at: string;
+  expires_at?: string;
+  renewed_at?: string;
+}
+
+export interface PhoneRentalsListResponse {
+  rentals: PhoneRentalResponse[];
+  total_count: number;
+}
+
+export interface PhoneRentalRenewResponse {
+  success: boolean;
+  rental_id: string;
+  new_expires_at?: string;
+  message: string;
+}
+
+// Phone Lookup API
+export const getPhoneLookupServices = async (): Promise<DaisySMSServicesResponse> => {
+  const response = await apiClient.get<DaisySMSServicesResponse>('/phone-lookup/services');
+  return response.data;
+};
+
+export const phoneLookupSearch = async (serviceCode: string): Promise<PhoneLookupResponse> => {
+  const response = await apiClient.post<PhoneLookupResponse>('/phone-lookup/search', {
+    service_code: serviceCode
+  });
+  return response.data;
+};
+
+export const getPhoneRentals = async (params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<PhoneRentalsListResponse> => {
+  const response = await apiClient.get<PhoneRentalsListResponse>('/phone-lookup/rentals', { params });
+  return response.data;
+};
+
+export const renewPhoneRental = async (rentalId: string): Promise<PhoneRentalRenewResponse> => {
+  const response = await apiClient.post<PhoneRentalRenewResponse>(`/phone-lookup/rentals/${rentalId}/renew`);
+  return response.data;
+};
+
+export const cancelPhoneRental = async (rentalId: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(`/phone-lookup/rentals/${rentalId}/cancel`);
+  return response.data;
+};
+
 // Error handling helper
 export const handleApiError = (error: unknown): string => {
   // Check if it's an AxiosError
@@ -1166,6 +1264,50 @@ export const handleApiError = (error: unknown): string => {
     return error.message;
   }
   return 'An unexpected error occurred';
+};
+
+// Subscription Types
+export interface SubscriptionPlanResponse {
+  id: string;
+  name: string;
+  duration_months: number;
+  price: number;
+  discount_percent: number;
+}
+
+export interface SubscriptionResponse {
+  id: string;
+  plan: SubscriptionPlanResponse;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+}
+
+export interface CheckAccessResponse {
+  has_access: boolean;
+  subscription?: SubscriptionResponse;
+  message: string;
+}
+
+// Subscriptions API
+export const getSubscriptionPlans = async (): Promise<SubscriptionPlanResponse[]> => {
+  const response = await apiClient.get<SubscriptionPlanResponse[]>('/subscriptions/plans');
+  return response.data;
+};
+
+export const purchaseSubscription = async (planId: string): Promise<SubscriptionResponse> => {
+  const response = await apiClient.post<SubscriptionResponse>('/subscriptions/purchase', { plan_id: planId });
+  return response.data;
+};
+
+export const getMySubscription = async (): Promise<SubscriptionResponse | null> => {
+  const response = await apiClient.get<SubscriptionResponse | null>('/subscriptions/my-subscription');
+  return response.data;
+};
+
+export const checkSubscriptionAccess = async (): Promise<CheckAccessResponse> => {
+  const response = await apiClient.get<CheckAccessResponse>('/subscriptions/check-access');
+  return response.data;
 };
 
 export default apiClient;

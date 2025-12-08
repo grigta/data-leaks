@@ -1,6 +1,9 @@
 {
 	"dashboard": "Dashboard",
 	"instantSSN": "Instant SSN",
+	"phoneLookup": "Phone Lookup",
+	"lookupSSN": "Lookup SSN",
+	"subscription": "Subscription",
 	"manualSSN": "Manual SSN",
 	"orders": "Orders",
 	"cart": "Cart",

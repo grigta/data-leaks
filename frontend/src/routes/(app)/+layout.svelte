@@ -6,6 +6,7 @@
 	import { user, logout } from '$lib/stores/auth';
 	import { loadUnviewedOrdersCount } from '$lib/stores/orders';
 	import { loadUnviewedTicketsCount, unviewedTicketsCount, incrementUnviewedTicketsCount } from '$lib/stores/tickets';
+	import { checkSubscriptionAccess, type CheckAccessResponse } from '$lib/api/client';
 	import { formatCurrency } from '$lib/utils';
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import { Badge } from '$lib/components/ui/badge';
@@ -24,6 +25,7 @@
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import Globe from '@lucide/svelte/icons/globe';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import { ANIMATION_DURATIONS } from '$lib/constants/animations';
 	import { currentLanguage } from '$lib/stores/language';
 	import { t } from '$lib/i18n';
@@ -47,6 +49,7 @@
 	let isLoggingOut = $state(false);
 	let codeVisible = $state(false);
 	let showCouponModal = $state(false);
+	let subscriptionStatus = $state<CheckAccessResponse | null>(null);
 
 	function toggleCodeVisibility() {
 		codeVisible = !codeVisible;
@@ -90,10 +93,19 @@
 		showCouponModal = false;
 	}
 
+	async function loadSubscriptionStatus() {
+		try {
+			subscriptionStatus = await checkSubscriptionAccess();
+		} catch (error) {
+			console.error('Failed to load subscription status:', error);
+		}
+	}
+
 	// Load unviewed orders and tickets count on mount after auth is initialized
 	onMount(() => {
 		loadUnviewedOrdersCount();
 		loadUnviewedTicketsCount();
+		loadSubscriptionStatus();
 
 		// Initialize WebSocket connection based on user role
 		if (browser) {
@@ -175,6 +187,23 @@
 							<Badge variant="secondary" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105">
 								<FileText class="h-3 w-3" />
 								{$unviewedTicketsCount} new
+							</Badge>
+						</a>
+					{/if}
+
+					<!-- Subscription Status Badge -->
+					{#if subscriptionStatus?.has_access}
+						<a href="/subscription" class="transition-opacity duration-normal hover:opacity-80">
+							<Badge variant="outline" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105 bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
+								<CreditCard class="h-3 w-3" />
+								Active
+							</Badge>
+						</a>
+					{:else if subscriptionStatus !== null}
+						<a href="/subscription" class="transition-opacity duration-normal hover:opacity-80">
+							<Badge variant="outline" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105 bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
+								<CreditCard class="h-3 w-3" />
+								No Sub
 							</Badge>
 						</a>
 					{/if}

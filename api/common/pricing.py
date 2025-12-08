@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 INSTANT_SSN_PRICE = Decimal("2.00")
 MANUAL_SSN_PRICE = Decimal("3.00")
 REVERSE_SSN_PRICE = Decimal("1.50")  # DEPRECATED: Used only for historical orders display
+PHONE_LOOKUP_PRICE = Decimal("3.00")  # Phone lookup via DaisySMS + SearchBug
 
 # External API costs
 SEARCHBUG_API_COST = Decimal("0.77")

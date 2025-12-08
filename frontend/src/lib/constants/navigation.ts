@@ -8,6 +8,8 @@ import Wallet from '@lucide/svelte/icons/wallet';
 import Code from '@lucide/svelte/icons/code';
 import HelpCircle from '@lucide/svelte/icons/help-circle';
 import MessageCircle from '@lucide/svelte/icons/message-circle';
+import Phone from '@lucide/svelte/icons/phone';
+import CreditCard from '@lucide/svelte/icons/credit-card';
 
 export interface NavItem {
 	href: string;
@@ -33,6 +35,12 @@ export function getNavItems(t: TranslateFunction): NavItem[] {
 			ariaLabel: `Navigate to ${t('navigation.instantSSN')}`
 		},
 		{
+			href: '/phone-lookup',
+			label: t('navigation.phoneLookup'),
+			icon: Phone,
+			ariaLabel: `Navigate to ${t('navigation.phoneLookup')}`
+		},
+		{
 			href: '/manual-ssn',
 			label: t('navigation.manualSSN'),
 			icon: FileText,
@@ -43,6 +51,12 @@ export function getNavItems(t: TranslateFunction): NavItem[] {
 			label: t('navigation.orders'),
 			icon: Package,
 			ariaLabel: `Navigate to ${t('navigation.orders')}`
+		},
+		{
+			href: '/subscription',
+			label: t('navigation.subscription'),
+			icon: CreditCard,
+			ariaLabel: `Navigate to ${t('navigation.subscription')}`
 		},
 		{
 			href: '/api',
@@ -80,6 +94,12 @@ export const NAV_ITEMS: NavItem[] = [
 		ariaLabel: 'Navigate to Instant SSN'
 	},
 	{
+		href: '/phone-lookup',
+		label: 'Phone Lookup',
+		icon: Phone,
+		ariaLabel: 'Navigate to Phone Lookup'
+	},
+	{
 		href: '/manual-ssn',
 		label: 'Manual SSN',
 		icon: FileText,
@@ -90,6 +110,12 @@ export const NAV_ITEMS: NavItem[] = [
 		label: 'Orders',
 		icon: Package,
 		ariaLabel: 'Navigate to Orders'
+	},
+	{
+		href: '/subscription',
+		label: 'Subscription',
+		icon: CreditCard,
+		ariaLabel: 'Navigate to Subscription'
 	},
 	{
 		href: '/api',

@@ -11,9 +11,21 @@ const resultsSection = document.getElementById('results');
 const resultsHeader = document.getElementById('resultsHeader');
 const resultsTableBody = document.getElementById('resultsTableBody');
 
+// Get auth token from localStorage
+function getAuthToken() {
+    return localStorage.getItem('access_token');
+}
+
 // Form Submit Handler
 searchForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // Check authentication
+    const token = getAuthToken();
+    if (!token) {
+        showError('Authentication required. Please login to use this feature.');
+        return;
+    }
 
     // Validate required fields
     const firstname = firstnameInput.value.trim();
@@ -43,14 +55,25 @@ searchForm.addEventListener('submit', async (e) => {
     if (phone) requestBody.phone = phone;
 
     try {
-        // Make POST request to lookup API
+        // Make POST request to lookup API with auth token
         const response = await fetch('/api/lookup/search', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(requestBody)
         });
+
+        // Handle auth errors
+        if (response.status === 401) {
+            throw new Error('Session expired. Please login again.');
+        }
+
+        // Handle subscription errors
+        if (response.status === 403) {
+            throw new Error('Active subscription required. Please purchase a subscription to access this feature.');
+        }
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -59,8 +82,8 @@ searchForm.addEventListener('submit', async (e) => {
 
         const data = await response.json();
 
-        // Display results
-        displayResults(data.combined_results || []);
+        // Display results (now using database_matches instead of combined_results)
+        displayResults(data.database_matches || []);
 
     } catch (error) {
         console.error('Search error:', error);

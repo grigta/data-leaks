@@ -399,3 +399,104 @@ class InstantSSNPurchaseResponse(BaseModel):
     order_id: Optional[str] = Field(None, description="UUID of created order")
     message: str
     new_balance: Optional[float] = Field(None, description="User's new balance after purchase")
+
+
+# ============================================
+# Phone Lookup Models
+# ============================================
+
+class PhoneLookupRequest(BaseModel):
+    """Request model for Phone Lookup search."""
+    service_code: str = Field(..., min_length=1, max_length=50, description="DaisySMS service code")
+
+    @field_validator('service_code')
+    @classmethod
+    def validate_service_code(cls, v: str) -> str:
+        """Validate service code format."""
+        v = v.strip().lower()
+        if not re.match(r'^[a-z0-9_]+$', v):
+            raise ValueError('Service code must contain only alphanumeric characters and underscores')
+        return v
+
+
+class DaisySMSService(BaseModel):
+    """Model for DaisySMS service."""
+    code: str = Field(..., description="Service code")
+    name: str = Field(..., description="Service name")
+    price: Optional[float] = Field(None, description="Service price in USD")
+
+
+class DaisySMSServicesResponse(BaseModel):
+    """Response model for services list."""
+    services: list[DaisySMSService] = Field(default_factory=list, description="List of available services")
+
+
+class PhoneLookupResult(BaseModel):
+    """Response model for Phone Lookup search result."""
+    # Phone from DaisySMS
+    phone_number: str = Field(..., max_length=MAX_PHONE_LENGTH)
+
+    # Person data from SearchBug
+    firstname: Optional[str] = Field(default=None, max_length=MAX_NAME_LENGTH)
+    lastname: Optional[str] = Field(default=None, max_length=MAX_NAME_LENGTH)
+    middlename: Optional[str] = Field(default=None, max_length=MAX_NAME_LENGTH)
+    dob: Optional[str] = Field(default=None, max_length=MAX_DOB_LENGTH)
+
+    # Address from SearchBug
+    address: Optional[str] = Field(default=None, max_length=MAX_ADDRESS_LENGTH)
+    city: Optional[str] = Field(default=None, max_length=MAX_CITY_LENGTH)
+    state: Optional[str] = Field(default=None, max_length=MAX_STATE_LENGTH)
+    zip_code: Optional[str] = Field(default=None, max_length=MAX_ZIP_LENGTH)
+
+    # Contact
+    email: Optional[str] = Field(default=None, max_length=MAX_EMAIL_LENGTH)
+
+    # SSN from local database
+    ssn: Optional[str] = Field(default=None, max_length=MAX_SSN_LENGTH)
+    ssn_found: bool = Field(default=False)
+
+    # Local database data
+    local_db_data: Optional[dict] = Field(default=None)
+
+
+class PhoneLookupResponse(BaseModel):
+    """Response wrapper for Phone Lookup."""
+    success: bool
+    phone_number: Optional[str] = None
+    rental_id: Optional[str] = None
+    daisysms_id: Optional[str] = None
+    person_data: Optional[PhoneLookupResult] = None
+    error: Optional[str] = None
+    message: Optional[str] = None
+    new_balance: Optional[float] = None
+    order_id: Optional[str] = None
+    charged_amount: Optional[float] = None
+
+
+class PhoneRentalResponse(BaseModel):
+    """Response model for a phone rental."""
+    id: str
+    daisysms_id: str
+    phone_number: str
+    service_code: str
+    service_name: str
+    status: str
+    ssn_found: bool
+    person_data: Optional[dict] = None
+    created_at: str
+    expires_at: Optional[str] = None
+
+
+class PhoneRentalsListResponse(BaseModel):
+    """Response model for list of phone rentals."""
+    rentals: list[PhoneRentalResponse] = Field(default_factory=list)
+    total: int = 0
+
+
+class PhoneRentalRenewResponse(BaseModel):
+    """Response model for rental renewal."""
+    success: bool
+    rental_id: Optional[str] = None
+    new_expires_at: Optional[str] = None
+    message: Optional[str] = None
+    error: Optional[str] = None

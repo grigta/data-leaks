@@ -1,0 +1,14 @@
+{
+	"title": "Subscription",
+	"description": "Get unlimited access to Lookup SSN feature with a subscription plan.",
+	"currentStatus": "Current Subscription Status",
+	"noSubscription": "No Active Subscription",
+	"noSubscriptionDesc": "Purchase a subscription plan to access Lookup SSN feature.",
+	"availablePlans": "Available Plans",
+	"choosePlan": "Choose a plan that works for you. Longer plans offer better value.",
+	"importantInfo": "Important Information",
+	"infoDeducted": "Subscription cost will be deducted from your account balance.",
+	"infoNoRefund": "Subscriptions are non-refundable.",
+	"infoManualRenew": "Subscriptions do not auto-renew. You need to purchase again after expiry.",
+	"infoAccessExpire": "Access to Lookup SSN will be disabled when subscription expires."
+}
