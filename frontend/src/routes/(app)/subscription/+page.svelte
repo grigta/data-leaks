@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { user, refreshUser } from '$lib/stores/auth';
 	import {
 		getSubscriptionPlans,
@@ -74,11 +74,36 @@
 	let searchError = $state('');
 	let hasSearched = $state(false);
 
+	// Periodic refresh interval ID
+	let subscriptionRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
 	// Computed
 	const selectedPlan = $derived(plans.find((p) => p.id === selectedPlanId));
 
 	onMount(async () => {
 		await Promise.all([loadPlans(), loadSubscription()]);
+
+		// Set up periodic subscription status refresh every 5 minutes
+		subscriptionRefreshInterval = setInterval(async () => {
+			const previousSubscription = currentSubscription;
+			try {
+				currentSubscription = await getMySubscription();
+				// If subscription expired (was non-null, now null), clear search state
+				if (previousSubscription && !currentSubscription) {
+					clearSearchForm();
+				}
+			} catch (error) {
+				console.error('Failed to refresh subscription status:', error);
+			}
+		}, 5 * 60 * 1000); // 5 minutes
+	});
+
+	onDestroy(() => {
+		// Clean up interval on component unmount
+		if (subscriptionRefreshInterval) {
+			clearInterval(subscriptionRefreshInterval);
+			subscriptionRefreshInterval = null;
+		}
 	});
 
 	async function loadPlans() {
@@ -434,10 +459,14 @@
 											<TableHead>{$t('subscription.name')}</TableHead>
 											<TableHead>{$t('subscription.ssn')}</TableHead>
 											<TableHead>{$t('subscription.dob')}</TableHead>
+											<TableHead>{$t('subscription.age')}</TableHead>
+											<TableHead>{$t('subscription.gender')}</TableHead>
 											<TableHead>{$t('subscription.city')}</TableHead>
 											<TableHead>{$t('subscription.state')}</TableHead>
+											<TableHead>{$t('subscription.zip')}</TableHead>
 											<TableHead>{$t('subscription.phones')}</TableHead>
 											<TableHead>{$t('subscription.emails')}</TableHead>
+											<TableHead>{$t('subscription.addresses')}</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -448,10 +477,14 @@
 												</TableCell>
 												<TableCell class="font-mono">{result.ssn || '-'}</TableCell>
 												<TableCell>{result.dob || '-'}</TableCell>
+												<TableCell>{result.age ?? '-'}</TableCell>
+												<TableCell>{result.gender || '-'}</TableCell>
 												<TableCell>{result.city || '-'}</TableCell>
 												<TableCell>{result.state || '-'}</TableCell>
+												<TableCell>{result.zip || '-'}</TableCell>
 												<TableCell class="max-w-[200px] truncate">{formatPhones(result.phones || [])}</TableCell>
 												<TableCell class="max-w-[200px] truncate">{formatEmails(result.emails || [])}</TableCell>
+												<TableCell class="max-w-[250px] truncate">{formatAddresses(result.addresses || [])}</TableCell>
 											</TableRow>
 										{/each}
 									</TableBody>
