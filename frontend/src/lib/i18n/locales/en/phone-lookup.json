@@ -24,7 +24,7 @@
 	"selectService": "Select Service",
 	"searchServices": "Search services...",
 	"noServicesFound": "No services found",
-	"typeToSearch": "Type to search among {count} available services",
+	"typeToSearch": "Type to search among available services",
 	"cost": "Cost",
 	"costDescription": "$3.00 per lookup (charged only if SSN is found)",
 	"costHint": "Select a service to get a phone number. The number will be searched in our database to find associated personal information including SSN.",

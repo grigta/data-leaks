@@ -221,7 +221,7 @@
 							</div>
 						{:else}
 							<p class="text-sm text-muted-foreground">
-								{$t('phone-lookup.typeToSearch', { count: services.length })}
+								{$t('phone-lookup.typeToSearch')}
 							</p>
 						{/if}
 					</div>
