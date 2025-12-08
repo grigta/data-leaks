@@ -38,7 +38,15 @@
 	let rentals = $state<PhoneRentalResponse[]>([]);
 	let isLoadingRentals = $state(false);
 	let searchQuery = $state('');
-	let isInputFocused = $state(false);
+	let isDropdownOpen = $state(false);
+	let dropdownContainerRef: HTMLDivElement | null = $state(null);
+
+	// Handle click outside to close dropdown
+	function handleClickOutside(event: MouseEvent) {
+		if (dropdownContainerRef && !dropdownContainerRef.contains(event.target as Node)) {
+			isDropdownOpen = false;
+		}
+	}
 
 	// Filtered services based on search query
 	const filteredServices = $derived(
@@ -132,6 +140,8 @@
 	<title>{$t('phone-lookup.title')}</title>
 </svelte:head>
 
+<svelte:window onclick={handleClickOutside} />
+
 <PhoneLookupResultModal
 	open={showResultModal}
 	response={searchResponse}
@@ -174,7 +184,7 @@
 
 				<div class="space-y-6">
 					<!-- Service Selection -->
-					<div class="space-y-2">
+					<div class="space-y-2" bind:this={dropdownContainerRef}>
 						<Label for="service-search" class="text-sm font-medium">{$t('phone-lookup.selectService')} *</Label>
 						<div class="relative">
 							<Input
@@ -182,21 +192,20 @@
 								type="text"
 								bind:value={searchQuery}
 								placeholder={$t('phone-lookup.searchServices')}
-								onfocus={() => isInputFocused = true}
-								onblur={() => setTimeout(() => isInputFocused = false, 200)}
+								onfocus={() => isDropdownOpen = true}
 							/>
 						</div>
 
-						{#if isInputFocused || selectedService}
+						{#if isDropdownOpen || selectedService}
 							<div class="border border-border rounded-md max-h-64 overflow-y-auto bg-popover">
 								{#each filteredServices as service}
 									<button
 										type="button"
 										class="w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b last:border-b-0 bg-background hover:bg-accent hover:text-accent-foreground {selectedService === service.code ? 'bg-accent text-accent-foreground' : 'text-foreground'}"
-										onclick={() => {
+										onpointerdown={() => {
 											selectedService = service.code;
 											searchQuery = service.name;
-											isInputFocused = false;
+											isDropdownOpen = false;
 										}}
 									>
 										<span class="font-medium">{service.name}</span>
