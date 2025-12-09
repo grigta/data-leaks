@@ -340,18 +340,22 @@
 							<div class="space-y-2">
 								<Label class="text-sm text-muted-foreground">{$t('sms.phoneNumber')}</Label>
 								<div class="flex items-center gap-2">
-									<div class="flex-1 bg-background rounded-md p-3 font-mono text-lg">
+									<button
+										type="button"
+										class="flex-1 bg-background rounded-md p-3 font-mono text-lg text-left hover:bg-accent/50 transition-colors cursor-pointer"
+										onclick={() => copyToClipboard(activeRental!.phone_number, 'phone')}
+									>
 										{activeRental.phone_number}
-									</div>
+									</button>
 									<Button
 										variant="outline"
-										size="icon"
+										class="h-[46px] w-[46px] shrink-0"
 										onclick={() => copyToClipboard(activeRental!.phone_number, 'phone')}
 									>
 										{#if copiedPhone}
-											<Check class="h-4 w-4 text-green-500" />
+											<Check class="h-5 w-5 text-green-500" />
 										{:else}
-											<Copy class="h-4 w-4" />
+											<Copy class="h-5 w-5" />
 										{/if}
 									</Button>
 								</div>
@@ -374,18 +378,22 @@
 								<div class="space-y-2">
 									<Label class="text-sm text-muted-foreground">{$t('sms.smsCode')}</Label>
 									<div class="flex items-center gap-2">
-										<div class="flex-1 bg-green-100 dark:bg-green-900/30 rounded-md p-3 font-mono text-2xl text-center font-bold text-green-700 dark:text-green-400">
+										<button
+											type="button"
+											class="flex-1 bg-green-100 dark:bg-green-900/30 rounded-md p-3 font-mono text-2xl text-center font-bold text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
+											onclick={() => copyToClipboard(activeRental!.sms_code!, 'code')}
+										>
 											{activeRental.sms_code}
-										</div>
+										</button>
 										<Button
 											variant="outline"
-											size="icon"
+											class="h-[46px] w-[46px] shrink-0"
 											onclick={() => copyToClipboard(activeRental!.sms_code!, 'code')}
 										>
 											{#if copiedCode}
-												<Check class="h-4 w-4 text-green-500" />
+												<Check class="h-5 w-5 text-green-500" />
 											{:else}
-												<Copy class="h-4 w-4" />
+												<Copy class="h-5 w-5" />
 											{/if}
 										</Button>
 									</div>
@@ -402,11 +410,11 @@
 										</div>
 										<Button
 											variant="outline"
-											size="icon"
+											class="h-[46px] w-[46px] shrink-0"
 											disabled={isCheckingCode}
 											onclick={handleCheckCode}
 										>
-											<RefreshCw class="h-4 w-4 {isCheckingCode ? 'animate-spin' : ''}" />
+											<RefreshCw class="h-5 w-5 {isCheckingCode ? 'animate-spin' : ''}" />
 										</Button>
 									</div>
 								</div>
