@@ -390,10 +390,8 @@ async def phone_lookup_search(
 
         # Charge user and create order only if SSN found
         if ssn_matches:
-            # SSN found - finish rental (no refund from DaisySMS)
-            async with create_daisysms_client() as daisysms:
-                await daisysms.finish_number(phone_id)
-            rental.status = PhoneRentalStatus.finished
+            # SSN found - keep rental active for SMS code retrieval
+            # User will manually finish/cancel via UI
 
             current_user.balance -= phone_lookup_price
             await db.commit()
@@ -449,10 +447,8 @@ async def phone_lookup_search(
                 charged_amount=float(phone_lookup_price),
             )
         else:
-            # SSN not found - cancel rental and get refund from DaisySMS
-            async with create_daisysms_client() as daisysms:
-                await daisysms.cancel_number(phone_id)
-            rental.status = PhoneRentalStatus.cancelled
+            # SSN not found - keep rental active for SMS code retrieval
+            # User will manually finish/cancel via UI
 
             search_log.success = True
             search_log.ssn_found = False
