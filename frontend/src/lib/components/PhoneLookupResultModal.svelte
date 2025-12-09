@@ -48,6 +48,9 @@
 
 	const result = $derived(response?.person_data);
 	const rentalId = $derived(response?.rental_id);
+	const hasPersonData = $derived(
+		result?.firstname || result?.lastname || result?.address || result?.dob
+	);
 
 	function startPolling() {
 		if (pollingInterval) return;
@@ -329,7 +332,8 @@ SMS Code: ${smsCodeText}`;
 					</div>
 				{/if}
 
-				<!-- Top section: Full name and address -->
+				{#if hasPersonData}
+					<!-- Top section: Full name and address -->
 				<div class="border-b pb-3">
 					<h3 class="text-2xl font-bold mb-2">
 						{result.firstname || ''} {result.middlename ? result.middlename + ' ' : ''}{result.lastname || ''}
@@ -428,6 +432,12 @@ SMS Code: ${smsCodeText}`;
 								</div>
 							</div>
 						{/if}
+					</div>
+				{/if}
+				{:else}
+					<!-- No person data found -->
+					<div class="bg-muted/50 rounded-lg p-4 text-center">
+						<p class="text-muted-foreground">No owner information found for this phone number</p>
 					</div>
 				{/if}
 
