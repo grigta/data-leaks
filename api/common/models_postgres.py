@@ -783,6 +783,8 @@ class PhoneRental(Base):
         Index('idx_phone_rentals_status', 'status'),
         Index('idx_phone_rentals_created_at', 'created_at'),
         Index('idx_phone_rentals_service_code', 'service_code'),
+        Index('idx_phone_rentals_user_created', 'user_id', 'created_at'),  # For pagination
+        Index('idx_phone_rentals_user_status', 'user_id', 'status'),  # For active rentals
     )
 
 
@@ -815,6 +817,7 @@ class PhoneLookupSearch(Base):
         Index('idx_phone_lookup_searches_service_code', 'service_code'),
         Index('idx_phone_lookup_searches_created_at', 'created_at'),
         Index('idx_phone_lookup_searches_ssn_found', 'ssn_found'),
+        Index('idx_phone_lookup_searches_user_created', 'user_id', 'created_at'),  # For analytics
     )
 
 
@@ -853,6 +856,7 @@ class SMSRental(Base):
         Index('idx_sms_rentals_status', 'status'),
         Index('idx_sms_rentals_created_at', 'created_at'),
         Index('idx_sms_rentals_service_code', 'service_code'),
+        Index('idx_sms_rentals_user_created', 'user_id', 'created_at'),  # For pagination
     )
 
 
