@@ -321,11 +321,11 @@ async def phone_lookup_search(
             # Don't fail - just continue without SearchBug data
 
         if not searchbug_data:
-            # No data in SearchBug - finish rental, don't charge
+            # No data in SearchBug - cancel rental and get refund from DaisySMS
             async with create_daisysms_client() as daisysms:
-                await daisysms.finish_number(phone_id)
+                await daisysms.cancel_number(phone_id)
 
-            rental.status = PhoneRentalStatus.finished
+            rental.status = PhoneRentalStatus.cancelled
             search_log.success = True
             search_log.error_message = "No person data found in SearchBug"
             await db.commit()
@@ -388,14 +388,13 @@ async def phone_lookup_search(
         rental.ssn_found = len(ssn_matches) > 0
         rental.ssn_data = ssn_data
 
-        # Finish DaisySMS rental
-        async with create_daisysms_client() as daisysms:
-            await daisysms.finish_number(phone_id)
-
-        rental.status = PhoneRentalStatus.finished
-
         # Charge user and create order only if SSN found
         if ssn_matches:
+            # SSN found - finish rental (no refund from DaisySMS)
+            async with create_daisysms_client() as daisysms:
+                await daisysms.finish_number(phone_id)
+            rental.status = PhoneRentalStatus.finished
+
             current_user.balance -= phone_lookup_price
             await db.commit()
             await db.refresh(current_user)
@@ -450,6 +449,11 @@ async def phone_lookup_search(
                 charged_amount=float(phone_lookup_price),
             )
         else:
+            # SSN not found - cancel rental and get refund from DaisySMS
+            async with create_daisysms_client() as daisysms:
+                await daisysms.cancel_number(phone_id)
+            rental.status = PhoneRentalStatus.cancelled
+
             search_log.success = True
             search_log.ssn_found = False
             await db.commit()
