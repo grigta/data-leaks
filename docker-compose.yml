@@ -87,6 +87,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./api:/app/api
+      - ./alembic:/app/alembic
     ports:
       - "8000:8000"
     networks:
