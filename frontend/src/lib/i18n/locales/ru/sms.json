@@ -22,7 +22,7 @@
   "code": "Код",
   "numberObtained": "Номер телефона успешно получен",
   "errorGettingNumber": "Не удалось получить номер телефона",
-  "cancelledWithRefund": "Аренда отменена. Возвращено ${amount}",
+  "cancelledWithRefund": "Аренда отменена. Возвращено ${{amount}}",
   "cancelledNoRefund": "Аренда отменена (возврат недоступен)",
   "finished": "Аренда завершена"
 }

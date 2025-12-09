@@ -22,7 +22,7 @@
   "code": "Code",
   "numberObtained": "Phone number obtained successfully",
   "errorGettingNumber": "Failed to get phone number",
-  "cancelledWithRefund": "Rental cancelled. Refunded ${amount}",
+  "cancelledWithRefund": "Rental cancelled. Refunded ${{amount}}",
   "cancelledNoRefund": "Rental cancelled (no refund available)",
   "finished": "Rental finished"
 }
