@@ -212,7 +212,7 @@ jobs:
           SEARCHBUG_API_URL=https://data.searchbug.com/api/search.aspx
           SEARCHBUG_DEFAULT_LIMIT=100
           CRYPTOCURRENCYAPI_KEY=${{ secrets.CRYPTOCURRENCYAPI_KEY }}
-          IPN_WEBHOOK_URL=https://data-leaks.cc/api/public/billing/ipn/cryptocurrencyapi
+          IPN_WEBHOOK_URL=https://dataleaks.info/api/public/billing/ipn/cryptocurrencyapi
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALERT_BOT_TOKEN=${{ secrets.TELEGRAM_ALERT_BOT_TOKEN }}
           TELEGRAM_ALERT_CHANNEL_ID=${{ secrets.TELEGRAM_ALERT_CHANNEL_ID }}
@@ -246,17 +246,17 @@ jobs:
 
       - name: Copy .env to server
         run: |
-          scp -P ${{ secrets.DEPLOY_PORT }} -i ~/.ssh/deploy_key .env ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/root/soft/.env
+          scp -P ${{ secrets.DEPLOY_PORT }} -i ~/.ssh/deploy_key .env ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/root/opt/soft/.env
 
       - name: Deploy via SSH
         run: |
           ssh -p ${{ secrets.DEPLOY_PORT }} -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
-          cd /root/soft
+          cd /root/opt/soft
           git pull origin main
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker-compose down --remove-orphans
-          docker-compose pull
-          docker-compose up -d --force-recreate
+          docker compose -f docker-compose.ghcr.yml down --remove-orphans
+          docker compose -f docker-compose.ghcr.yml pull
+          docker compose -f docker-compose.ghcr.yml up -d --force-recreate
           sleep 10
           docker image prune -af --filter "until=168h"
           echo "Deploy completed!"
