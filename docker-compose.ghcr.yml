@@ -187,6 +187,29 @@ services:
       timeout: 10s
       retries: 3
 
+  # Lookup API service
+  lookup_api:
+    image: ghcr.io/grigta/lookup-api:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON_ENABLED: ${LOG_JSON_ENABLED:-true}
+    networks:
+      - backend
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Lookup Frontend service (work panel)
   lookup_frontend:
     image: ghcr.io/grigta/lookup-frontend:latest
@@ -250,6 +273,7 @@ services:
       - frontend
       - admin_frontend
       - lookup_frontend
+      - lookup_api
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./cloudflare-ips.conf:/etc/nginx/cloudflare-ips.conf:ro
