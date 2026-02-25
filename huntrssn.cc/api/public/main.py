@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from api.public.routers import auth_router, search_router, ecommerce_router, stats_router, billing_router, news_router, tickets_router, internal_router, support, contact, maintenance_router, admin_router, subscriptions_router, sms_router
 from api.common.database import dispose_engine
-from api.public.websocket import public_ws_manager
+from api.public.websocket import public_ws_manager, start_redis_subscriber
 from api.public.dependencies import get_current_user_ws
 from api.common.models_postgres import User
 from datetime import datetime
@@ -433,10 +433,12 @@ async def _monitor_error_rate():
 
 
 # Startup/shutdown events
+_redis_subscriber_task = None
+
 @app.on_event("startup")
 async def startup_event():
     """Startup event handler."""
-    global _error_rate_monitor_task
+    global _error_rate_monitor_task, _redis_subscriber_task
 
     logger.info("Public API starting up...")
     await security_logger.log_service_startup(
@@ -453,11 +455,14 @@ async def startup_event():
     _error_rate_monitor_task = asyncio.create_task(_monitor_error_rate())
     logger.info("Error rate monitor started")
 
+    # Start Redis subscriber for cross-worker WebSocket notifications
+    _redis_subscriber_task = asyncio.create_task(start_redis_subscriber())
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Shutdown event handler."""
-    global _error_rate_monitor_task
+    global _error_rate_monitor_task, _redis_subscriber_task
 
     # Stop error rate monitoring task
     if _error_rate_monitor_task:
@@ -467,6 +472,15 @@ async def shutdown_event():
         except asyncio.CancelledError:
             pass
         logger.info("Error rate monitor stopped")
+
+    # Stop Redis subscriber task
+    if _redis_subscriber_task:
+        _redis_subscriber_task.cancel()
+        try:
+            await _redis_subscriber_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Redis subscriber stopped")
 
     await security_logger.log_service_shutdown("graceful")
     logger.info("Public API shutting down...")

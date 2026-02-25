@@ -1,0 +1,61 @@
+{
+	"periods": {
+		"24h": "24 hours",
+		"7d": "7 days",
+		"30d": "30 days",
+		"all": "All time"
+	},
+	"general": {
+		"title": "General",
+		"totalProfit": "Total Profit",
+		"totalRoi": "Total ROI",
+		"deposits": "Deposits",
+		"avgDeposit": "Avg Deposit"
+	},
+	"instant": {
+		"title": "Instant (Instant SSN)",
+		"costInfo": "cost $0.85/attempt",
+		"profit": "Profit",
+		"roi": "ROI",
+		"successRate": "Success %",
+		"avgTime": "Avg Time",
+		"revenue": "Revenue",
+		"cost": "Cost",
+		"successful": "Successful",
+		"attempts": "Attempts"
+	},
+	"manual": {
+		"title": "Manual (Manual SSN)",
+		"costInfo": "cost $1.50/successful",
+		"profit": "Profit",
+		"roi": "ROI",
+		"successRate": "Success %",
+		"avgTime": "Avg Time",
+		"revenue": "Revenue",
+		"cost": "Cost",
+		"successful": "Successful",
+		"attempts": "Attempts"
+	},
+	"stats": {
+		"title": "Search Statistics",
+		"totalAttempts": "Total Attempts",
+		"instant": "Instant",
+		"manual": "Manual",
+		"notFound": "Not Found"
+	},
+	"time": {
+		"sec": "sec",
+		"min": "min",
+		"h": "h"
+	},
+	"clear": {
+		"button": "Clear Stats",
+		"title": "Clear Statistics",
+		"description": "This action cannot be undone. Choose what to clear:",
+		"last24h": "Last 24 hours",
+		"all": "All data",
+		"confirm": "Clear",
+		"cancel": "Cancel",
+		"success": "Statistics cleared successfully"
+	}
+}

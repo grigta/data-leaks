@@ -1,0 +1,31 @@
+{
+	"stats": {
+		"totalErrors": "Всего ошибок",
+		"today": "Сегодня",
+		"byApi": "По API"
+	},
+	"filters": {
+		"all": "Все",
+		"searchBug": "SearchBug",
+		"whitePages": "WhitePages"
+	},
+	"cleanup": "Очистить (30д+)",
+	"cleanupSuccess": "Удалено {{count}} старых записей",
+	"noErrors": "Ошибок не найдено",
+	"table": {
+		"date": "Дата",
+		"api": "API",
+		"errorType": "Тип ошибки",
+		"code": "Код",
+		"message": "Сообщение"
+	},
+	"detail": {
+		"title": "Детали ошибки",
+		"httpCode": "HTTP код",
+		"method": "Метод",
+		"errorType": "Тип ошибки",
+		"date": "Дата",
+		"errorMessage": "Сообщение ошибки",
+		"requestParams": "Параметры запроса"
+	}
+}

@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, case, cast, func, or_, select, Numeric, String
+from sqlalchemy import and_, case, cast, delete, func, or_, select, Numeric, String
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ from api.admin.dependencies import get_current_admin_user
 from api.common.database import get_postgres_session
 from api.common.models_postgres import (
     Coupon,
+    CustomPricing,
     Order,
     OrderStatus,
     Transaction,
@@ -30,6 +31,7 @@ from api.common.models_postgres import (
     ManualSSNTicket,
     TicketStatus,
     RequestSource,
+    TestSearchHistory,
 )
 
 router = APIRouter()
@@ -1038,4 +1040,537 @@ async def get_manual_ssn_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve Manual SSN statistics: {str(e)}",
+        )
+
+
+# ============================================
+# Profit Analytics Endpoints
+# ============================================
+
+
+class ProfitDashboardResponse(BaseModel):
+    """Profit dashboard analytics."""
+
+    total_profit: float = Field(..., description="Total profit (instant + manual)")
+    total_roi: float = Field(..., description="Total ROI percentage")
+    total_deposits: float = Field(..., description="Total deposits (paid transactions)")
+    instant_revenue: float = Field(0, description="Instant SSN total revenue")
+    instant_cost: float = Field(0, description="Instant SSN total API cost")
+    instant_profit: float = Field(0, description="Instant SSN profit")
+    instant_roi: float = Field(0, description="Instant SSN ROI percentage")
+    instant_success_rate: float = Field(0, description="Instant SSN success rate percentage")
+    instant_total_attempts: int = Field(0, description="Instant SSN total attempts")
+    instant_successful: int = Field(0, description="Instant SSN successful count")
+    manual_revenue: float = Field(0, description="Manual SSN total revenue")
+    manual_cost: float = Field(0, description="Manual SSN total cost")
+    manual_profit: float = Field(0, description="Manual SSN profit")
+    manual_roi: float = Field(0, description="Manual SSN ROI percentage")
+    manual_success_rate: float = Field(0, description="Manual SSN success rate percentage")
+    manual_total_attempts: int = Field(0, description="Manual SSN total attempts")
+    manual_successful: int = Field(0, description="Manual SSN completed count")
+    total_searches: int = Field(0, description="Total instant SSN search attempts")
+    instant_found: int = Field(0, description="Instant SSN found count")
+    manual_found: int = Field(0, description="Manual SSN completed count")
+    not_found: int = Field(0, description="Manual SSN not completed count")
+    instant_avg_search_time: Optional[float] = Field(None, description="Instant SSN average search time in seconds")
+    manual_avg_response_time: Optional[float] = Field(None, description="Manual SSN average response time in minutes")
+    avg_deposit: float = Field(0, description="Average deposit amount")
+    period: str = Field(..., description="Time period filter")
+
+
+class ProfitUserItem(BaseModel):
+    """Single user item in profit users table."""
+
+    id: str
+    username: str
+    search_price: float = Field(0, description="User's instant SSN price")
+    search_mode: str = Field("auto", description="Search mode (auto/instant/manual)")
+    total_profit: float = Field(0)
+    instant_profit: float = Field(0)
+    manual_profit: float = Field(0)
+    instant_roi: float = Field(0)
+    instant_success_rate: float = Field(0)
+    manual_roi: float = Field(0)
+    manual_success_rate: float = Field(0)
+    total_deposited: float = Field(0)
+    balance: float = Field(0)
+    created_at: str
+    is_banned: bool = Field(False)
+
+
+class ProfitUsersResponse(BaseModel):
+    """Paginated profit users table response."""
+
+    users: List[ProfitUserItem]
+    total_count: int
+    page: int
+    page_size: int
+
+
+@router.get("/profit-dashboard", response_model=ProfitDashboardResponse)
+async def get_profit_dashboard(
+    period: str = Query("all", regex="^(1d|7d|30d|all)$"),
+    db: AsyncSession = Depends(get_postgres_session),
+    _admin: User = Depends(get_current_admin_user),
+):
+    """
+    Get profit dashboard analytics.
+    Calculates profit, ROI, and margins for instant and manual SSN searches.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from api.common.pricing import MANUAL_SSN_PRICE, MANUAL_SSN_COST, INSTANT_SSN_ATTEMPT_COST
+
+        # Calculate time filter
+        time_filter = None
+        if period == "1d":
+            time_filter = datetime.utcnow() - timedelta(days=1)
+        elif period == "7d":
+            time_filter = datetime.utcnow() - timedelta(days=7)
+        elif period == "30d":
+            time_filter = datetime.utcnow() - timedelta(days=30)
+
+        # --- Instant SSN stats ---
+        instant_conditions = []
+        if time_filter:
+            instant_conditions.append(InstantSSNSearch.created_at >= time_filter)
+
+        # Revenue from successful searches
+        instant_revenue_query = select(
+            func.coalesce(func.sum(InstantSSNSearch.user_charged), 0).label("revenue"),
+        ).where(
+            InstantSSNSearch.success == True,
+            *instant_conditions,
+        )
+        instant_revenue_result = await db.execute(instant_revenue_query)
+        instant_revenue = float(instant_revenue_result.scalar() or 0)
+
+        # Total search attempts
+        total_searches_query = select(func.count()).select_from(InstantSSNSearch)
+        if instant_conditions:
+            total_searches_query = total_searches_query.where(*instant_conditions)
+        total_searches_result = await db.execute(total_searches_query)
+        total_searches = total_searches_result.scalar() or 0
+
+        # Successful searches count
+        instant_successful_query = select(func.count()).select_from(InstantSSNSearch).where(
+            InstantSSNSearch.success == True,
+            *instant_conditions,
+        )
+        instant_successful_result = await db.execute(instant_successful_query)
+        instant_successful = instant_successful_result.scalar() or 0
+
+        # SSN found count
+        instant_found_query = select(func.count()).select_from(InstantSSNSearch).where(
+            InstantSSNSearch.ssn_found == True,
+            *instant_conditions,
+        )
+        instant_found_result = await db.execute(instant_found_query)
+        instant_found = instant_found_result.scalar() or 0
+
+        # Instant cost = all attempts × $0.85
+        instant_cost = float(total_searches) * float(INSTANT_SSN_ATTEMPT_COST)
+        instant_profit = instant_revenue - instant_cost
+        instant_roi = (instant_profit / instant_cost * 100) if instant_cost > 0 else 0
+        instant_success_rate = (instant_successful / total_searches * 100) if total_searches > 0 else 0
+
+        # --- Manual SSN stats ---
+        manual_conditions = []
+        if time_filter:
+            manual_conditions.append(ManualSSNTicket.created_at >= time_filter)
+
+        # Total manual attempts
+        manual_total_query = select(func.count()).select_from(ManualSSNTicket)
+        if manual_conditions:
+            manual_total_query = manual_total_query.where(*manual_conditions)
+        manual_total_result = await db.execute(manual_total_query)
+        manual_total_attempts = manual_total_result.scalar() or 0
+
+        # Completed manual tickets
+        manual_completed_query = select(func.count()).select_from(ManualSSNTicket).where(
+            ManualSSNTicket.status == TicketStatus.completed,
+            *manual_conditions,
+        )
+        manual_completed_result = await db.execute(manual_completed_query)
+        manual_found = manual_completed_result.scalar() or 0
+
+        # Not-found (pending + processing + rejected)
+        manual_not_found_query = select(func.count()).select_from(ManualSSNTicket).where(
+            ManualSSNTicket.status.in_([TicketStatus.pending, TicketStatus.processing, TicketStatus.rejected]),
+            *manual_conditions,
+        )
+        manual_not_found_result = await db.execute(manual_not_found_query)
+        not_found = manual_not_found_result.scalar() or 0
+
+        # Manual revenue = SUM(custom price or default) for completed tickets
+        manual_revenue_query = select(
+            func.coalesce(
+                func.sum(func.coalesce(CustomPricing.price, float(MANUAL_SSN_PRICE))),
+                0
+            )
+        ).select_from(ManualSSNTicket).outerjoin(
+            CustomPricing,
+            and_(
+                CustomPricing.user_id == ManualSSNTicket.user_id,
+                CustomPricing.service_name == 'manual_ssn',
+                CustomPricing.is_active == True,
+            )
+        ).where(
+            ManualSSNTicket.status == TicketStatus.completed,
+            *manual_conditions,
+        )
+        manual_revenue_result = await db.execute(manual_revenue_query)
+        manual_revenue = float(manual_revenue_result.scalar() or 0)
+        manual_cost = float(manual_found) * float(MANUAL_SSN_COST)
+        manual_profit = manual_revenue - manual_cost
+        manual_roi = (manual_profit / manual_cost * 100) if manual_cost > 0 else 0
+        manual_success_rate = (manual_found / manual_total_attempts * 100) if manual_total_attempts > 0 else 0
+
+        # --- Totals ---
+        total_profit = instant_profit + manual_profit
+        total_cost = instant_cost + manual_cost
+        total_roi = (total_profit / total_cost * 100) if total_cost > 0 else 0
+
+        # --- Average search times ---
+        # Instant: average search_time from TestSearchHistory (seconds)
+        instant_time_conditions = [TestSearchHistory.search_time.isnot(None)]
+        if time_filter:
+            instant_time_conditions.append(TestSearchHistory.created_at >= time_filter)
+        instant_avg_query = select(
+            func.avg(TestSearchHistory.search_time)
+        ).where(*instant_time_conditions)
+        instant_avg_result = await db.execute(instant_avg_query)
+        instant_avg_search_time = instant_avg_result.scalar()
+        if instant_avg_search_time is not None:
+            instant_avg_search_time = round(float(instant_avg_search_time), 2)
+
+        # Manual: average response time (updated_at - created_at) in minutes
+        manual_time_conditions = [ManualSSNTicket.status == TicketStatus.completed]
+        if time_filter:
+            manual_time_conditions.append(ManualSSNTicket.created_at >= time_filter)
+        manual_avg_query = select(
+            func.avg(func.extract('epoch', ManualSSNTicket.updated_at - ManualSSNTicket.created_at) / 60)
+        ).where(*manual_time_conditions)
+        manual_avg_result = await db.execute(manual_avg_query)
+        manual_avg_response_time = manual_avg_result.scalar()
+        if manual_avg_response_time is not None:
+            manual_avg_response_time = round(float(manual_avg_response_time), 2)
+
+        # --- Deposits ---
+        deposit_conditions = []
+        if time_filter:
+            deposit_conditions.append(Transaction.created_at >= time_filter)
+
+        deposit_query = select(
+            func.coalesce(func.sum(Transaction.amount), 0),
+            func.coalesce(func.avg(Transaction.amount), 0),
+        ).where(
+            Transaction.status == TransactionStatus.paid,
+            *deposit_conditions,
+        )
+        deposit_result = await db.execute(deposit_query)
+        deposit_row = deposit_result.one()
+        total_deposits = float(deposit_row[0] or 0)
+        avg_deposit = float(deposit_row[1] or 0)
+
+        return ProfitDashboardResponse(
+            total_profit=round(total_profit, 2),
+            total_roi=round(total_roi, 2),
+            total_deposits=round(total_deposits, 2),
+            instant_revenue=round(instant_revenue, 2),
+            instant_cost=round(instant_cost, 2),
+            instant_profit=round(instant_profit, 2),
+            instant_roi=round(instant_roi, 2),
+            instant_success_rate=round(instant_success_rate, 2),
+            instant_total_attempts=total_searches,
+            instant_successful=instant_successful,
+            manual_revenue=round(manual_revenue, 2),
+            manual_cost=round(manual_cost, 2),
+            manual_profit=round(manual_profit, 2),
+            manual_roi=round(manual_roi, 2),
+            manual_success_rate=round(manual_success_rate, 2),
+            manual_total_attempts=manual_total_attempts,
+            manual_successful=manual_found,
+            total_searches=total_searches,
+            instant_found=instant_found,
+            manual_found=manual_found,
+            not_found=not_found,
+            instant_avg_search_time=instant_avg_search_time,
+            manual_avg_response_time=manual_avg_response_time,
+            avg_deposit=round(avg_deposit, 2),
+            period=period,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve profit dashboard: {str(e)}",
+        )
+
+
+@router.delete("/profit-dashboard/clear")
+async def clear_profit_dashboard_stats(
+    period: str = Query("all", regex="^(1d|all)$"),
+    db: AsyncSession = Depends(get_postgres_session),
+    _admin: User = Depends(get_current_admin_user),
+):
+    """Clear statistics data. period='1d' clears last 24h, period='all' clears everything."""
+    from datetime import datetime, timedelta
+
+    try:
+        time_filter = None
+        if period == "1d":
+            time_filter = datetime.utcnow() - timedelta(days=1)
+
+        # Clear instant SSN searches
+        instant_q = delete(InstantSSNSearch)
+        if time_filter:
+            instant_q = instant_q.where(InstantSSNSearch.created_at >= time_filter)
+        await db.execute(instant_q)
+
+        # Clear test search history
+        test_q = delete(TestSearchHistory)
+        if time_filter:
+            test_q = test_q.where(TestSearchHistory.created_at >= time_filter)
+        await db.execute(test_q)
+
+        await db.commit()
+        return {"status": "ok", "cleared": period}
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear statistics: {str(e)}",
+        )
+
+
+@router.get("/profit-users", response_model=ProfitUsersResponse)
+async def get_profit_users(
+    period: str = Query("all", regex="^(1d|7d|30d|all)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    search: Optional[str] = Query(default=None),
+    sort_by: Optional[str] = Query(default="total_profit", description="Sort field"),
+    sort_order: Optional[str] = Query(default="desc"),
+    db: AsyncSession = Depends(get_postgres_session),
+    _admin: User = Depends(get_current_admin_user),
+):
+    """
+    Get paginated profit analytics per user.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from api.common.pricing import INSTANT_SSN_PRICE, MANUAL_SSN_PRICE, MANUAL_SSN_COST
+
+        # Calculate time filter
+        time_filter = None
+        if period == "1d":
+            time_filter = datetime.utcnow() - timedelta(days=1)
+        elif period == "7d":
+            time_filter = datetime.utcnow() - timedelta(days=7)
+        elif period == "30d":
+            time_filter = datetime.utcnow() - timedelta(days=30)
+
+        # --- Subquery: instant SSN stats per user (successful only for revenue/cost) ---
+        instant_conditions = [InstantSSNSearch.success == True]
+        if time_filter:
+            instant_conditions.append(InstantSSNSearch.created_at >= time_filter)
+
+        instant_subq = (
+            select(
+                InstantSSNSearch.user_id,
+                func.coalesce(func.sum(InstantSSNSearch.user_charged), 0).label("instant_revenue"),
+                func.coalesce(func.sum(InstantSSNSearch.api_cost), 0).label("instant_cost"),
+            )
+            .where(*instant_conditions)
+            .group_by(InstantSSNSearch.user_id)
+            .subquery()
+        )
+
+        # --- Subquery: instant SSN total attempts per user (for success rate) ---
+        instant_attempts_query = select(
+            InstantSSNSearch.user_id,
+            func.count().label("instant_total"),
+            func.sum(case((InstantSSNSearch.success == True, 1), else_=0)).label("instant_successful"),
+        )
+        if time_filter:
+            instant_attempts_query = instant_attempts_query.where(InstantSSNSearch.created_at >= time_filter)
+        instant_attempts_subq = instant_attempts_query.group_by(InstantSSNSearch.user_id).subquery()
+
+        # --- Subquery: manual SSN stats per user (completed + total) ---
+        manual_subq_query = select(
+            ManualSSNTicket.user_id,
+            func.count().label("manual_total"),
+            func.sum(case((ManualSSNTicket.status == TicketStatus.completed, 1), else_=0)).label("manual_completed"),
+        )
+        if time_filter:
+            manual_subq_query = manual_subq_query.where(ManualSSNTicket.created_at >= time_filter)
+        manual_subq = manual_subq_query.group_by(ManualSSNTicket.user_id).subquery()
+
+        # --- Subquery: deposits per user ---
+        deposit_conditions = [Transaction.status == TransactionStatus.paid]
+        if time_filter:
+            deposit_conditions.append(Transaction.created_at >= time_filter)
+
+        deposit_subq = (
+            select(
+                Transaction.user_id,
+                func.coalesce(func.sum(Transaction.amount), 0).label("total_deposited"),
+            )
+            .where(*deposit_conditions)
+            .group_by(Transaction.user_id)
+            .subquery()
+        )
+
+        # --- Subquery: custom instant_ssn pricing per user ---
+        pricing_subq = (
+            select(
+                CustomPricing.user_id,
+                CustomPricing.price.label("custom_price"),
+            )
+            .where(
+                CustomPricing.service_name == "instant_ssn",
+                CustomPricing.is_active == True,
+            )
+            .subquery()
+        )
+
+        # --- Subquery: custom manual_ssn pricing per user ---
+        manual_pricing_subq = (
+            select(
+                CustomPricing.user_id,
+                CustomPricing.price.label("manual_custom_price"),
+            )
+            .where(
+                CustomPricing.service_name == "manual_ssn",
+                CustomPricing.is_active == True,
+            )
+            .subquery()
+        )
+
+        # Calculated columns
+        instant_revenue_col = func.coalesce(instant_subq.c.instant_revenue, 0)
+        instant_cost_col = func.coalesce(instant_subq.c.instant_cost, 0)
+        instant_profit_col = instant_revenue_col - instant_cost_col
+
+        manual_completed_col = func.coalesce(manual_subq.c.manual_completed, 0)
+        manual_price_col = func.coalesce(manual_pricing_subq.c.manual_custom_price, float(MANUAL_SSN_PRICE))
+        manual_profit_col = manual_completed_col * (manual_price_col - float(MANUAL_SSN_COST))
+
+        total_profit_col = instant_profit_col + manual_profit_col
+
+        # Main query
+        main_query = (
+            select(
+                User.id,
+                User.username,
+                User.balance,
+                User.search_mode,
+                User.is_banned,
+                User.created_at,
+                instant_revenue_col.label("instant_revenue"),
+                instant_cost_col.label("instant_cost"),
+                instant_profit_col.label("instant_profit"),
+                func.coalesce(instant_attempts_subq.c.instant_total, 0).label("instant_total"),
+                func.coalesce(instant_attempts_subq.c.instant_successful, 0).label("instant_successful"),
+                manual_completed_col.label("manual_completed"),
+                func.coalesce(manual_subq.c.manual_total, 0).label("manual_total"),
+                manual_price_col.label("manual_price"),
+                manual_profit_col.label("manual_profit"),
+                total_profit_col.label("total_profit"),
+                func.coalesce(deposit_subq.c.total_deposited, 0).label("total_deposited"),
+                func.coalesce(pricing_subq.c.custom_price, float(INSTANT_SSN_PRICE)).label("search_price"),
+            )
+            .outerjoin(instant_subq, User.id == instant_subq.c.user_id)
+            .outerjoin(instant_attempts_subq, User.id == instant_attempts_subq.c.user_id)
+            .outerjoin(manual_subq, User.id == manual_subq.c.user_id)
+            .outerjoin(deposit_subq, User.id == deposit_subq.c.user_id)
+            .outerjoin(pricing_subq, User.id == pricing_subq.c.user_id)
+            .outerjoin(manual_pricing_subq, User.id == manual_pricing_subq.c.user_id)
+        )
+
+        # Search filter
+        if search:
+            main_query = main_query.where(
+                or_(User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%"))
+            )
+
+        # Sorting
+        sort_map = {
+            "total_profit": total_profit_col,
+            "instant_profit": instant_profit_col,
+            "manual_profit": manual_profit_col,
+            "total_deposited": func.coalesce(deposit_subq.c.total_deposited, 0),
+            "balance": User.balance,
+            "username": User.username,
+            "created_at": User.created_at,
+        }
+        sort_column = sort_map.get(sort_by, total_profit_col)
+
+        if sort_order == "asc":
+            main_query = main_query.order_by(sort_column.asc())
+        else:
+            main_query = main_query.order_by(sort_column.desc())
+
+        # Count query
+        count_query = select(func.count()).select_from(User)
+        if search:
+            count_query = count_query.where(
+                or_(User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%"))
+            )
+        count_result = await db.execute(count_query)
+        total_count = count_result.scalar() or 0
+
+        # Pagination
+        main_query = main_query.offset(offset).limit(limit)
+
+        result = await db.execute(main_query)
+        rows = result.all()
+
+        users = []
+        for row in rows:
+            i_cost = float(row.instant_cost)
+            i_profit = float(row.instant_profit)
+            i_roi = (i_profit / i_cost * 100) if i_cost > 0 else 0
+            i_total = int(row.instant_total)
+            i_successful = int(row.instant_successful)
+            i_success_rate = (i_successful / i_total * 100) if i_total > 0 else 0
+
+            m_completed = int(row.manual_completed)
+            m_total = int(row.manual_total)
+            m_cost = m_completed * float(MANUAL_SSN_COST)
+            m_profit = float(row.manual_profit)
+            m_roi = (m_profit / m_cost * 100) if m_cost > 0 else 0
+            m_success_rate = (m_completed / m_total * 100) if m_total > 0 else 0
+
+            users.append(ProfitUserItem(
+                id=str(row.id),
+                username=row.username,
+                search_price=float(row.search_price),
+                search_mode=row.search_mode or "auto",
+                total_profit=round(float(row.total_profit), 2),
+                instant_profit=round(i_profit, 2),
+                manual_profit=round(m_profit, 2),
+                instant_roi=round(i_roi, 2),
+                instant_success_rate=round(i_success_rate, 2),
+                manual_roi=round(m_roi, 2),
+                manual_success_rate=round(m_success_rate, 2),
+                total_deposited=round(float(row.total_deposited), 2),
+                balance=float(row.balance),
+                created_at=row.created_at.isoformat(),
+                is_banned=row.is_banned,
+            ))
+
+        return ProfitUsersResponse(
+            users=users,
+            total_count=total_count,
+            page=offset // limit if limit > 0 else 0,
+            page_size=limit,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve profit users: {str(e)}",
         )

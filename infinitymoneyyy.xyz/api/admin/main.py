@@ -9,11 +9,13 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request, status, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from datetime import datetime, timedelta
+from sqlalchemy import select, update, and_
 
-from api.admin.routers import auth_router, users_router, coupons_router, analytics_router, news_router, workers_router, tickets_router, stats_router, transactions_router, orders_router, support, contact, maintenance, custom_pricing
+from api.admin.routers import auth_router, users_router, coupons_router, analytics_router, news_router, workers_router, workers_mgmt_router, tickets_router, stats_router, transactions_router, orders_router, support, contact, maintenance, custom_pricing, internal, errors, settings, test_polygon
 from api.admin.websocket import ws_manager
 from api.common.database import dispose_engine, async_session_maker
+from api.common.models_postgres import SupportThread, MessageStatus
 from api.common.auth import decode_access_token
 from api.common.models_postgres import User
 
@@ -29,8 +31,9 @@ setup_logging(service_name="admin_api", log_level=log_level, json_enabled=json_e
 logger = get_logger(__name__)
 security_logger = SecurityEventLogger("admin_api")
 
-# Background task for error rate monitoring
+# Background tasks
 _error_rate_monitor_task = None
+_auto_close_threads_task = None
 _error_rate_threshold = 10.0  # Alert if error rate > 10%
 _error_rate_check_interval = 60  # Check every 60 seconds
 _error_rate_window = 300  # 5 minute window
@@ -66,11 +69,44 @@ async def _monitor_error_rate():
             await asyncio.sleep(10)
 
 
+async def _auto_close_answered_threads():
+    """Background task: close 'answered' threads after 72 hours of inactivity."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # check every hour
+
+            cutoff = datetime.utcnow() - timedelta(hours=72)
+            async with async_session_maker() as db:
+                stmt = (
+                    update(SupportThread)
+                    .where(
+                        and_(
+                            SupportThread.status == MessageStatus.answered,
+                            SupportThread.last_message_at < cutoff
+                        )
+                    )
+                    .values(status=MessageStatus.closed)
+                )
+                result = await db.execute(stmt)
+                closed_count = result.rowcount
+                await db.commit()
+
+                if closed_count > 0:
+                    logger.info(f"Auto-closed {closed_count} answered threads (inactive >72h)")
+
+        except asyncio.CancelledError:
+            logger.info("Auto-close threads task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error in auto-close threads task: {e}", exc_info=True)
+            await asyncio.sleep(60)
+
+
 # Lifespan context manager for startup/shutdown events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle startup and shutdown events."""
-    global _error_rate_monitor_task
+    global _error_rate_monitor_task, _auto_close_threads_task
 
     logger.info("Admin API starting up...")
     await security_logger.log_service_startup(
@@ -82,20 +118,22 @@ async def lifespan(app: FastAPI):
         }
     )
 
-    # Start error rate monitoring task
+    # Start background tasks
     _error_rate_monitor_task = asyncio.create_task(_monitor_error_rate())
-    logger.info("Error rate monitor started")
+    _auto_close_threads_task = asyncio.create_task(_auto_close_answered_threads())
+    logger.info("Background tasks started (error rate monitor, auto-close threads)")
 
     yield
 
-    # Stop error rate monitoring task
-    if _error_rate_monitor_task:
-        _error_rate_monitor_task.cancel()
-        try:
-            await _error_rate_monitor_task
-        except asyncio.CancelledError:
-            pass
-        logger.info("Error rate monitor stopped")
+    # Stop background tasks
+    for task in (_error_rate_monitor_task, _auto_close_threads_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+    logger.info("Background tasks stopped")
 
     await security_logger.log_service_shutdown("graceful")
     logger.info("Admin API shutting down...")
@@ -155,6 +193,7 @@ app.add_middleware(CorrelationIdMiddleware)
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(workers_router)
+app.include_router(workers_mgmt_router, tags=["Workers"])
 app.include_router(coupons_router, prefix="/coupons", tags=["Coupon Management"])
 app.include_router(analytics_router, prefix="/analytics", tags=["Analytics & Statistics"])
 app.include_router(news_router, prefix="/news", tags=["News Management"])
@@ -167,6 +206,10 @@ app.include_router(orders_router, prefix="/orders", tags=["Order Management"])
 app.include_router(maintenance.router, prefix="/maintenance", tags=["Maintenance Mode"])
 app.include_router(custom_pricing.router, prefix="/custom-pricing", tags=["Custom Pricing"])
 app.include_router(users_router, tags=["User Management"])
+app.include_router(internal.router, tags=["Internal"])
+app.include_router(errors.router, tags=["API Error Logs"])
+app.include_router(settings.router, prefix="/settings", tags=["Settings"])
+app.include_router(test_polygon.router, tags=["Test Polygon"])
 
 
 # WebSocket endpoint
@@ -228,9 +271,9 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(
                 security_logger.log_failed_login("websocket", client_ip, "user_not_found")
                 return
 
-            if not (user.is_admin or user.worker_role):
-                await websocket.close(code=1008, reason="Admin or worker privileges required")
-                logger.warning(f"WebSocket connection denied for user without admin or worker privileges: {user.username}")
+            if not user.is_admin:
+                await websocket.close(code=1008, reason="Admin privileges required")
+                logger.warning(f"WebSocket connection denied for non-admin user: {user.username}")
                 security_logger.log_suspicious_activity(
                     ip=client_ip,
                     activity_type="unauthorized_ws_access",

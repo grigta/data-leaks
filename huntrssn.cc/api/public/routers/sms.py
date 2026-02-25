@@ -36,6 +36,7 @@ from api.common.daisysms_client import (
 )
 from api.common.daisysms_services import SERVICE_CODE_TO_NAME, get_service_name
 from api.common.pricing import SMS_MARKUP, round_price_to_5_cents
+from api.public.websocket import publish_user_notification, WebSocketEventType
 
 
 router = APIRouter(tags=["SMS Service"])
@@ -312,6 +313,13 @@ async def get_sms_number(
                     f"price=${user_price}"
                 )
 
+                # Notify about balance change via WebSocket
+                await publish_user_notification(
+                    str(current_user.id),
+                    WebSocketEventType.BALANCE_UPDATED,
+                    {"user_id": str(current_user.id), "new_balance": float(current_user.balance)}
+                )
+
                 return SMSGetNumberResponse(
                     success=True,
                     rental_id=str(rental.id),
@@ -548,6 +556,13 @@ async def cancel_sms_rental(
                 logger.info(
                     f"SMS rental cancelled with refund: user={current_user.username}, "
                     f"rental={rental_id}, refund=${refund_amount}"
+                )
+
+                # Notify about balance change via WebSocket
+                await publish_user_notification(
+                    str(current_user.id),
+                    WebSocketEventType.BALANCE_UPDATED,
+                    {"user_id": str(current_user.id), "new_balance": float(current_user.balance)}
                 )
 
                 return SMSCancelResponse(

@@ -11,11 +11,12 @@ import json
 import logging
 from datetime import datetime
 from pydantic import BaseModel
-from api.common.database import get_postgres_session, SQLITE_PATH
+from api.common.database import get_postgres_session
 from api.common.models_postgres import User, Order, CartItem, OrderStatus, OrderType
 from api.common.models_sqlite import InstantSSNPurchaseRequest, InstantSSNPurchaseResponse
 from api.public.dependencies import get_current_user, limiter
-from database.data_manager import DataManager
+from database.search_engine_factory import get_search_engine
+from api.public.websocket import publish_user_notification, WebSocketEventType
 
 logger = logging.getLogger(__name__)
 
@@ -183,14 +184,15 @@ async def instant_purchase(
             detail="Price is required for instant purchase. Use /orders/instant-purchase-with-enrichment for enrichment-based pricing."
         )
 
-    # Validate SSN exists in SQLite
-    data_manager = DataManager(db_path=SQLITE_PATH)
+    # Validate SSN exists in ClickHouse
+    search_engine = get_search_engine()
+    results_json = search_engine.search_by_ssn(purchase_request.ssn, limit=1)
+    results = json.loads(results_json)
 
-    result_dict = data_manager.get_record(purchase_request.table_name, purchase_request.ssn)
-    if result_dict is None:
+    if not results:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"SSN record not found in {purchase_request.table_name}"
+            detail=f"SSN record not found"
         )
 
     # Check balance
@@ -228,6 +230,14 @@ async def instant_purchase(
         # Commit transaction
         await db.commit()
         await db.refresh(new_order)
+        await db.refresh(current_user)
+
+        # Notify about balance change via WebSocket
+        await publish_user_notification(
+            str(current_user.id),
+            WebSocketEventType.BALANCE_UPDATED,
+            {"user_id": str(current_user.id), "new_balance": float(current_user.balance)}
+        )
 
         return OrderResponse(
             id=str(new_order.id),
@@ -333,19 +343,19 @@ async def get_order(
             detail="Order not found"
         )
 
-    # Load SSN details for items
+    # Load SSN details for items from ClickHouse
     items_with_details = []
-    data_manager = DataManager(db_path=SQLITE_PATH)
+    search_engine = get_search_engine()
 
     for item in order.items:
         ssn = item.get('ssn')
-        # Try to load SSN details
+        # Load SSN details from ClickHouse
         ssn_details = None
-        for table_name in ['ssn_1', 'ssn_2']:
-            result_dict = data_manager.get_record(table_name, ssn)
-            if result_dict is not None:
-                ssn_details = result_dict
-                break
+        if ssn:
+            results_json = search_engine.search_by_ssn(ssn, limit=1)
+            results = json.loads(results_json)
+            if results:
+                ssn_details = results[0]
 
         items_with_details.append({
             **item,

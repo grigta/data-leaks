@@ -17,33 +17,29 @@
 	} from '$lib/components/ui/dropdown-menu';
 	import { Badge } from '$lib/components/ui/badge';
 	import {
-		LayoutDashboard,
-		Ticket,
 		Users,
 		LogOut,
 		Menu,
 		X,
 		Lock,
-		Settings,
-		Newspaper,
-		UserCog,
-		FileText,
-		ClipboardList,
-		UserCheck,
-		BarChart3,
-		MessageCircle,
-		Mail,
-		DollarSign,
 		Sun,
 		Moon,
 		Monitor,
-		UserX
+		TrendingUp,
+		MessageSquare,
+		Wrench,
+		AlertTriangle,
+		ShoppingCart,
+		Settings,
+		Globe,
+		FlaskConical
 	} from '@lucide/svelte';
-	import { wsManager, connectionStatus, THREAD_CREATED, THREAD_MESSAGE_ADDED, CONTACT_THREAD_CREATED, CONTACT_THREAD_MESSAGE_ADDED, CONTACT_THREAD_MESSAGES_READ, TICKET_CREATED, TICKET_UPDATED } from '$lib/websocket/manager';
+	import { wsManager, connectionStatus } from '$lib/websocket/manager';
 	import { browser } from '$app/environment';
 	import type { Snippet } from 'svelte';
 	import { setMode, userPrefersMode } from 'mode-watcher';
-	import { getUnreadThreadsCount, getContactThreadUnreadCount, getPendingTicketsCount } from '$lib/api/client';
+	import { t } from '$lib/i18n';
+	import { currentLanguage } from '$lib/stores/language';
 
 	interface Props {
 		children?: Snippet;
@@ -55,199 +51,31 @@
 	let isLoggingOut = $state(false);
 	let sidebarOpen = $state(true);
 	let wsConnected = $state(false);
-	let unreadSupportCount = $state(0);
-	let unreadContactCount = $state(0);
-	let pendingTicketsCount = $state(0);
 
 	// Get user info from auth store
 	let authState = $derived($authStore);
 	let userInfo = $derived(authState.user);
 	let isAdmin = $derived(userInfo?.is_admin ?? false);
-	let isWorker = $derived(userInfo?.worker_role ?? false);
 
 	// Theme state
 	let currentTheme = $derived($userPrefersMode);
 
-	// Load unread support threads count
-	async function loadUnreadSupportCount() {
-		if (!isAdmin) return;
-		try {
-			unreadSupportCount = await getUnreadThreadsCount();
-		} catch (error) {
-			console.error('Failed to load unread support count:', error);
-		}
-	}
-
-	// Decrement unread support count (called from support page)
-	export function decrementUnreadSupportCount(amount: number = 1) {
-		unreadSupportCount = Math.max(0, unreadSupportCount - amount);
-	}
-
-	// Load unread contact threads count
-	async function loadUnreadContactCount() {
-		if (!isAdmin) return;
-		try {
-			const response = await getContactThreadUnreadCount();
-			unreadContactCount = response.count;
-		} catch (error) {
-			console.error('Failed to load unread contact count:', error);
-		}
-	}
-
-	// Load pending tickets count
-	async function loadPendingTicketsCount() {
-		// Load for both workers and admins
-		if (!isWorker && !isAdmin) return;
-		try {
-			pendingTicketsCount = await getPendingTicketsCount();
-		} catch (error) {
-			console.error('Failed to load pending tickets count:', error);
-		}
-	}
-
-	// All navigation items with role requirements
-	const allNavItems = [
-		{
-			href: '/dashboard',
-			label: 'Панель управления',
-			icon: LayoutDashboard,
-			requiresAdmin: false,
-			requiresWorker: false
-		},
-		{
-			href: '/instant-ssn-stats',
-			label: 'Статистика Instant SSN',
-			icon: BarChart3,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/manual-ssn-stats',
-			label: 'Статистика Manual SSN',
-			icon: BarChart3,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/telegram-stats',
-			label: 'Статистика Telegram',
-			icon: MessageCircle,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/maintenance-mode',
-			label: 'Технические работы',
-			icon: Settings,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/workers',
-			label: 'Работники',
-			icon: UserCog,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/worker-requests',
-			label: 'Запросы работников',
-			icon: UserCheck,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/tickets',
-			label: 'История тикетов',
-			icon: ClipboardList,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/manual-ssn',
-			label: 'Ручная обработка SSN',
-			icon: FileText,
-			requiresAdmin: false,
-			requiresWorker: true
-		},
-		{
-			href: '/coupons',
-			label: 'Купоны',
-			icon: Ticket,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/custom-pricing',
-			label: 'Уникальные цены',
-			icon: DollarSign,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/news',
-			label: 'Новости',
-			icon: Newspaper,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/users',
-			label: 'Пользователи',
-			icon: Users,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/bans',
-			label: 'Список банов',
-			icon: UserX,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/support-messages',
-			label: 'Сообщения поддержки',
-			icon: MessageCircle,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/contact-messages',
-			label: 'Контактные сообщения',
-			icon: Mail,
-			requiresAdmin: true,
-			requiresWorker: false
-		},
-		{
-			href: '/settings',
-			label: 'Настройки',
-			icon: Settings,
-			requiresAdmin: false,
-			requiresWorker: false
-		}
+	// Navigation items
+	const navKeys = [
+		{ href: '/profit-dashboard', labelKey: 'navigation.profitDashboard', icon: TrendingUp, requiresAdmin: true },
+		{ href: '/profit-users', labelKey: 'navigation.profitUsers', icon: Users, requiresAdmin: true },
+		{ href: '/report', labelKey: 'navigation.report', icon: MessageSquare, requiresAdmin: true },
+		{ href: '/workers', labelKey: 'navigation.workers', icon: Wrench, requiresAdmin: true },
+		{ href: '/error-logs', labelKey: 'navigation.apiErrors', icon: AlertTriangle, requiresAdmin: true },
+		{ href: '/orders', labelKey: 'navigation.allOrders', icon: ShoppingCart, requiresAdmin: true },
+		{ href: '/test-polygon', labelKey: 'navigation.testPolygon', icon: FlaskConical, requiresAdmin: true },
+		{ href: '/settings', labelKey: 'navigation.settings', icon: Settings, requiresAdmin: true }
 	];
 
-	// Filter navigation items based on user role
 	let navItems = $derived(
-		allNavItems.filter((item) => {
-			// Pure worker (worker_role=true, is_admin=false) - show ONLY worker items
-			if (isWorker && !isAdmin) {
-				return item.requiresWorker;
-			}
-
-			// Admin (is_admin=true, worker_role=false) - show admin items and common items, but NOT worker items
-			if (isAdmin && !isWorker) {
-				return !item.requiresWorker;
-			}
-
-			// Admin with worker role (is_admin=true, worker_role=true) - show everything
-			if (isAdmin && isWorker) {
-				return true;
-			}
-
-			// Regular user (neither admin nor worker) - show only common items
-			return !item.requiresAdmin && !item.requiresWorker;
+		navKeys.filter((item) => {
+			if (isAdmin) return true;
+			return !item.requiresAdmin;
 		})
 	);
 
@@ -273,6 +101,24 @@
 			.slice(0, 2);
 	}
 
+	// Get page title key from path
+	function getPageTitleKey(pathname: string): string {
+		if (pathname.includes('profit-dashboard')) return 'navigation.profitDashboard';
+		if (pathname.includes('profit-users')) return 'navigation.profitUsers';
+		if (pathname.includes('report')) return 'navigation.report';
+		if (pathname.includes('workers')) return 'navigation.workers';
+		if (pathname.includes('error-logs')) return 'navigation.apiErrors';
+		if (pathname.includes('orders')) return 'navigation.allOrders';
+		if (pathname.includes('test-polygon')) return 'navigation.testPolygon';
+		if (pathname.includes('settings')) return 'navigation.settings';
+		return 'navigation.adminPanel';
+	}
+
+	// Toggle language
+	function toggleLanguage() {
+		currentLanguage.toggle();
+	}
+
 	// Setup WebSocket
 	function setupWebSocket() {
 		if (!browser) return;
@@ -281,7 +127,6 @@
 		if (token) {
 			wsManager.connect(token);
 
-			// Subscribe to connection status changes
 			connectionStatus.subscribe((status) => {
 				wsConnected = status;
 			});
@@ -295,57 +140,6 @@
 
 	onMount(() => {
 		setupWebSocket();
-		loadUnreadSupportCount();
-		loadUnreadContactCount();
-		loadPendingTicketsCount();
-
-		// Subscribe to WebSocket events for unread support count
-		const unsubscribeThreadCreated = wsManager.on(THREAD_CREATED, () => {
-			loadUnreadSupportCount();
-		});
-
-		const unsubscribeMessageAdded = wsManager.on(THREAD_MESSAGE_ADDED, (data: any) => {
-			// Increment count only for new user messages
-			if (data.message_type === 'user') {
-				unreadSupportCount = unreadSupportCount + 1;
-			}
-		});
-
-		// Subscribe to WebSocket events for unread contact count
-		const unsubscribeContactThreadCreated = wsManager.on(CONTACT_THREAD_CREATED, () => {
-			loadUnreadContactCount();
-		});
-
-		const unsubscribeContactMessageAdded = wsManager.on(CONTACT_THREAD_MESSAGE_ADDED, (data: any) => {
-			// Increment count only for new user messages
-			if (data.message_type === 'user') {
-				unreadContactCount = unreadContactCount + 1;
-			}
-		});
-
-		const unsubscribeContactMessagesRead = wsManager.on(CONTACT_THREAD_MESSAGES_READ, () => {
-			loadUnreadContactCount();
-		});
-
-		// Subscribe to WebSocket events for pending tickets count
-		const unsubscribeTicketCreated = wsManager.on(TICKET_CREATED, () => {
-			loadPendingTicketsCount();
-		});
-
-		const unsubscribeTicketUpdated = wsManager.on(TICKET_UPDATED, (data: any) => {
-			// Reload count when ticket status changes
-			loadPendingTicketsCount();
-		});
-
-		return () => {
-			unsubscribeThreadCreated();
-			unsubscribeMessageAdded();
-			unsubscribeContactThreadCreated();
-			unsubscribeContactMessageAdded();
-			unsubscribeContactMessagesRead();
-			unsubscribeTicketCreated();
-			unsubscribeTicketUpdated();
-		};
 	});
 
 	onDestroy(() => {
@@ -362,7 +156,7 @@
 		<!-- Logo/Brand -->
 		<div class="flex h-16 items-center gap-2 border-b px-6">
 			<Lock class="h-6 w-6 text-primary" />
-			<span class="text-lg font-semibold">Админ панель</span>
+			<span class="text-lg font-semibold">{$t('navigation.adminPanel')}</span>
 		</div>
 
 		<!-- Navigation -->
@@ -375,29 +169,13 @@
 					onclick={() => goto(item.href)}
 				>
 					<Icon class="mr-2 h-4 w-4" />
-					{item.label}
-					{#if item.href === '/support-messages' && unreadSupportCount > 0}
-						<Badge variant="destructive" class="ml-auto text-xs">
-							{unreadSupportCount}
-						</Badge>
-					{/if}
-					{#if item.href === '/contact-messages' && unreadContactCount > 0}
-						<Badge variant="destructive" class="ml-auto text-xs">
-							{unreadContactCount}
-						</Badge>
-					{/if}
-					{#if item.href === '/manual-ssn' && pendingTicketsCount > 0}
-						<Badge variant="destructive" class="ml-auto text-xs">
-							{pendingTicketsCount}
-						</Badge>
-					{/if}
+					{$t(item.labelKey)}
 				</Button>
 			{/each}
 		</nav>
 
 		<!-- Bottom section -->
 		<div class="border-t p-4">
-			<!-- User menu -->
 			<DropdownMenu>
 				<DropdownMenuTrigger>
 					{#snippet child({ props })}
@@ -410,37 +188,37 @@
 					{/snippet}
 				</DropdownMenuTrigger>
 				<DropdownMenuContent class="w-56" align="end">
-					<DropdownMenuLabel>Мой аккаунт</DropdownMenuLabel>
+					<DropdownMenuLabel>{$t('navigation.myAccount')}</DropdownMenuLabel>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
-						<DropdownMenuLabel>Тема оформления</DropdownMenuLabel>
+						<DropdownMenuLabel>{$t('navigation.theme')}</DropdownMenuLabel>
 						<DropdownMenuItem
 							onclick={() => setMode('light')}
 							class={currentTheme === 'light' ? 'bg-accent' : ''}
 						>
 							<Sun class="mr-2 h-4 w-4" />
-							Светлая
+							{$t('navigation.themeLight')}
 						</DropdownMenuItem>
 						<DropdownMenuItem
 							onclick={() => setMode('dark')}
 							class={currentTheme === 'dark' ? 'bg-accent' : ''}
 						>
 							<Moon class="mr-2 h-4 w-4" />
-							Тёмная
+							{$t('navigation.themeDark')}
 						</DropdownMenuItem>
 						<DropdownMenuItem
 							onclick={() => setMode('system')}
 							class={currentTheme === 'system' ? 'bg-accent' : ''}
 						>
 							<Monitor class="mr-2 h-4 w-4" />
-							Системная
+							{$t('navigation.themeSystem')}
 						</DropdownMenuItem>
 					</DropdownMenuGroup>
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
 						<DropdownMenuItem onclick={handleLogout} disabled={isLoggingOut}>
 							<LogOut class="mr-2 h-4 w-4" />
-							{isLoggingOut ? 'Выход из системы...' : 'Выход'}
+							{isLoggingOut ? $t('navigation.loggingOut') : $t('navigation.logout')}
 						</DropdownMenuItem>
 					</DropdownMenuGroup>
 				</DropdownMenuContent>
@@ -462,61 +240,37 @@
 				</Button>
 
 				<h1 class="text-xl font-semibold">
-					{#if $page.url.pathname.includes('dashboard')}
-						Панель управления
-					{:else if $page.url.pathname.includes('instant-ssn-stats')}
-						Статистика Instant SSN
-					{:else if $page.url.pathname.includes('manual-ssn-stats')}
-						Статистика Manual SSN
-					{:else if $page.url.pathname.includes('telegram-stats')}
-						Статистика Telegram
-					{:else if $page.url.pathname.includes('workers') && !$page.url.pathname.includes('worker-requests')}
-						Управление работниками
-					{:else if $page.url.pathname.includes('worker-requests')}
-						Запросы работников
-					{:else if $page.url.pathname.includes('tickets')}
-						История тикетов
-					{:else if $page.url.pathname.includes('manual-ssn')}
-						Ручная обработка SSN
-					{:else if $page.url.pathname.includes('coupons')}
-						Управление купонами
-					{:else if $page.url.pathname.includes('maintenance-mode')}
-						Технические работы
-					{:else if $page.url.pathname.includes('custom-pricing')}
-						Уникальные цены
-					{:else if $page.url.pathname.includes('news')}
-						Управление новостями
-					{:else if $page.url.pathname.includes('users')}
-						Управление пользователями
-					{:else if $page.url.pathname.includes('bans')}
-						Список банов
-					{:else if $page.url.pathname.includes('settings')}
-						Настройки
-					{:else}
-						Админ панель
-					{/if}
+					{$t(getPageTitleKey($page.url.pathname))}
 				</h1>
 			</div>
 
 			<div class="flex items-center gap-2">
+				<Button
+					variant="ghost"
+					size="icon"
+					onclick={toggleLanguage}
+					title={$currentLanguage === 'en' ? 'Switch to Russian' : 'Switch to English'}
+				>
+					<Globe class="h-4 w-4" />
+				</Button>
 				{#if wsConnected}
 					<Badge variant="outline" class="text-green-600 border-green-600">
 						<span class="mr-1 h-2 w-2 rounded-full bg-green-600"></span>
-						Подключено
+						{$t('common.connected')}
 					</Badge>
 				{:else}
 					<Badge variant="outline" class="text-red-600 border-red-600">
 						<span class="mr-1 h-2 w-2 rounded-full bg-red-600"></span>
-						Отключено
+						{$t('common.disconnected')}
 					</Badge>
 				{/if}
-				<Badge variant="secondary">Администратор</Badge>
+				<Badge variant="secondary">{$t('common.administrator')}</Badge>
 			</div>
 		</header>
 
 		<!-- Page content -->
 		<main class="flex-1 overflow-y-auto bg-background p-6">
-			<div class="mx-auto max-w-7xl">
+			<div class="mx-auto">
 				{@render children?.()}
 			</div>
 		</main>

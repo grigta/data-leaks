@@ -1,0 +1,35 @@
+{
+	"filters": {
+		"all": "Все",
+		"completed": "Завершённые",
+		"pending": "В ожидании",
+		"failed": "Ошибка",
+		"cancelled": "Отменённые"
+	},
+	"ordersCount": "{{count}} заказов",
+	"noOrders": "Заказы не найдены",
+	"table": {
+		"id": "#",
+		"status": "Статус",
+		"type": "Тип",
+		"user": "Юзер",
+		"price": "Цена",
+		"cost": "Себес",
+		"profit": "Профит",
+		"date": "Дата"
+	},
+	"detail": {
+		"title": "Детали заказа",
+		"orderId": "ID заказа",
+		"status": "Статус",
+		"type": "Тип",
+		"user": "Юзер",
+		"userId": "ID юзера",
+		"date": "Дата",
+		"clientPrice": "Цена клиента",
+		"cost": "Себес ({{count}} шт.)",
+		"profit": "Профит",
+		"items": "Позиции ({{count}})"
+	},
+	"pagination": "{{count}} заказов, страница {{current}} из {{total}}"
+}

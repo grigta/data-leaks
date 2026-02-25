@@ -14,7 +14,7 @@ export default defineConfig({
     host: '0.0.0.0',
     strictPort: true,
     cors: true,
-    allowedHosts: ['localhost', 'huntrssn.cc', 'www.huntrssn.cc'],
+    allowedHosts: ['localhost', 'na71ka921ma.top', 'www.na71ka921ma.top'],
     proxy: {
       '/api/public': {
         target: process.env.PUBLIC_API_URL || 'http://public_api:8000',

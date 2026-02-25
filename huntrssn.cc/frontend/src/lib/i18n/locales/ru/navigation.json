@@ -6,6 +6,8 @@
 	"subscription": "Подписка на БД",
 	"lookupSSN": "Поиск SSN",
 	"manualSSN": "Ручной SSN",
+	"search": "Поиск",
+	"testSearch": "Тест поиск",
 	"orders": "Заказы",
 	"cart": "Корзина",
 	"api": "API",
@@ -15,6 +17,10 @@
 	"balance": "Баланс",
 	"profile": "Профиль",
 	"addBalance": "Пополнить баланс",
+	"quickActions": "Быстрые действия",
+	"deposit": "Пополнить",
+	"coupon": "Купон",
+	"accessCode": "Код доступа",
 	"logout": "Выход",
 	"loggingOut": "Выход..."
 }

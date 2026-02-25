@@ -1,0 +1,29 @@
+# Dockerfile for Telegram Bot - local build
+FROM python:3.11-slim as builder
+
+RUN apt-get update && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY shared/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+FROM python:3.11-slim
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+
+COPY --chown=appuser:appuser bot/ /app/bot
+COPY --chown=appuser:appuser shared/api/common/ /app/api/common
+COPY --chown=appuser:appuser shared/api/__init__.py /app/api/__init__.py
+COPY --chown=appuser:appuser shared/database/ /app/database
+
+USER appuser
+ENV PYTHONPATH=/app
+
+CMD ["python", "bot/main.py"]

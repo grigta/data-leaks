@@ -17,6 +17,7 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 pyotp==2.9.0
+qrcode[pil]==8.0
 
 # Pydantic for validation
 pydantic==2.5.3
@@ -35,3 +36,6 @@ aiohttp==3.9.3
 # Payment Gateway SDKs
 # Note: heleket SDK is optional, can use httpx directly for Helket API
 # heleket>=1.0.0
+
+# ClickHouse client for analytical queries
+clickhouse-connect>=0.7.0

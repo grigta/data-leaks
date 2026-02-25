@@ -268,32 +268,6 @@ async def register(
     Raises:
         HTTPException: If access code generation fails or coupon/invitation validation fails
     """
-    # Check if registration requires a coupon using requires_registration field
-    if not coupon_code:
-        # Check if any active coupon with requires_registration=True exists
-        required_coupon_result = await db.execute(
-            select(Coupon).where(
-                and_(
-                    Coupon.is_active == True,
-                    Coupon.requires_registration == True,
-                    Coupon.current_uses < Coupon.max_uses
-                )
-            ).limit(1)
-        )
-        required_coupon = required_coupon_result.scalar_one_or_none()
-
-        if required_coupon:
-            # At least one active registration-required coupon exists, so registration without code is not allowed
-            security_logger.log_suspicious_activity(
-                ip="unknown",  # IP is logged by middleware
-                activity_type="registration_without_required_coupon",
-                details={}
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Registration requires a valid registration coupon code"
-            )
-
     # Generate unique access code
     max_attempts = 10
     for _ in range(max_attempts):
@@ -561,7 +535,10 @@ async def login(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_postgres_session)
+):
     """
     Get current user profile.
 
@@ -571,6 +548,13 @@ async def get_me(current_user: User = Depends(get_current_user)):
     Returns:
         User profile data
     """
+    from api.common.pricing import get_user_price_by_id, get_default_instant_ssn_price
+
+    default_instant_price = await get_default_instant_ssn_price(db)
+    search_price = await get_user_price_by_id(
+        db, current_user.id, 'instant_ssn', default_instant_price
+    )
+
     return UserResponse(
         id=str(current_user.id),
         username=current_user.username,
@@ -579,6 +563,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         jabber=current_user.jabber,
         balance=float(current_user.balance),
         access_code=current_user.access_code,
+        is_admin=current_user.is_admin,
         is_banned=current_user.is_banned,
         ban_reason=current_user.ban_reason,
         banned_at=current_user.banned_at,
@@ -586,6 +571,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         invitation_code=current_user.invitation_code,
         invited_by=str(current_user.invited_by) if current_user.invited_by else None,
         invitation_bonus_received=current_user.invitation_bonus_received,
+        search_price=float(search_price),
         created_at=current_user.created_at
     )
 
@@ -684,6 +670,7 @@ async def update_profile(
         jabber=current_user.jabber,
         balance=float(current_user.balance),
         access_code=current_user.access_code,
+        is_admin=current_user.is_admin,
         is_banned=current_user.is_banned,
         ban_reason=current_user.ban_reason,
         banned_at=current_user.banned_at,

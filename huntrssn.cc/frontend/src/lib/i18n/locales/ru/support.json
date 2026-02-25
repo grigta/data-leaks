@@ -1,7 +1,8 @@
 {
-  "title": "Чат поддержки",
+  "title": "Поддержка",
   "description": "Задавайте вопросы и получайте помощь от нашей команды поддержки",
   "newThread": "Новый тред",
+  "newTicket": "Новый тикет",
   "noThreads": "Нет активных тредов",
   "noSubject": "Без темы",
   "subject": "Тема",
@@ -25,7 +26,16 @@
   "pending": "Ожидает ответа",
   "answered": "Отвечено",
   "closed": "Закрыто",
+  "pendingColumn": "Ожидает ответа",
+  "answeredColumn": "Отвечено",
+  "closedColumn": "Закрыто",
+  "ticketDetail": "Детали тикета",
+  "replyPlaceholder": "Введите ваш ответ...",
+  "noTicketsInColumn": "Нет тикетов",
   "sendSuccess": "Сообщение отправлено успешно",
   "sendError": "Не удалось отправить сообщение",
-  "loadError": "Не удалось загрузить данные"
+  "loadError": "Не удалось загрузить данные",
+  "today": "Сегодня",
+  "you": "Вы",
+  "supportTeam": "Поддержка"
 }

@@ -3,11 +3,12 @@ User Ban Management Router for Admin API
 Handles listing banned users and unbanning functionality
 """
 
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
 from datetime import datetime
 import logging
@@ -247,4 +248,127 @@ async def ban_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to ban user: {str(e)}"
+        )
+
+
+# ============================================
+# User Actions
+# ============================================
+
+
+class AddBalanceRequest(BaseModel):
+    amount: Decimal = Field(..., gt=0, le=100000, description="Amount to add to user balance")
+
+
+class AddBalanceResponse(BaseModel):
+    message: str
+    user_id: str
+    username: str
+    new_balance: float
+
+
+class SetSearchModeRequest(BaseModel):
+    search_mode: Literal["auto", "instant", "manual"] = Field(..., description="Search mode to set")
+
+
+class SetSearchModeResponse(BaseModel):
+    message: str
+    user_id: str
+    username: str
+    search_mode: str
+
+
+@router.post("/{user_id}/add-balance", response_model=AddBalanceResponse)
+async def add_user_balance(
+    user_id: UUID,
+    request: AddBalanceRequest,
+    db: AsyncSession = Depends(get_postgres_session),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    Add balance to a user's account.
+    Does NOT create a transaction record.
+    """
+    try:
+        query = select(User).where(User.id == user_id)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found",
+            )
+
+        user.balance = user.balance + request.amount
+        await db.commit()
+        await db.refresh(user)
+
+        logger.info(
+            f"Admin {current_admin.username} added ${request.amount} to user {user.username} "
+            f"(ID: {user.id}), new balance: ${user.balance}"
+        )
+
+        return AddBalanceResponse(
+            message=f"Added ${request.amount} to {user.username}'s balance",
+            user_id=str(user.id),
+            username=user.username,
+            new_balance=float(user.balance),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error adding balance to user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add balance: {str(e)}",
+        )
+
+
+@router.patch("/{user_id}/search-mode", response_model=SetSearchModeResponse)
+async def set_user_search_mode(
+    user_id: UUID,
+    request: SetSearchModeRequest,
+    db: AsyncSession = Depends(get_postgres_session),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    """
+    Set search mode for a user (auto/instant/manual).
+    """
+    try:
+        query = select(User).where(User.id == user_id)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found",
+            )
+
+        user.search_mode = request.search_mode
+        await db.commit()
+
+        logger.info(
+            f"Admin {current_admin.username} set search_mode={request.search_mode} "
+            f"for user {user.username} (ID: {user.id})"
+        )
+
+        return SetSearchModeResponse(
+            message=f"Search mode for {user.username} set to {request.search_mode}",
+            user_id=str(user.id),
+            username=user.username,
+            search_mode=request.search_mode,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error setting search mode for user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set search mode: {str(e)}",
         )

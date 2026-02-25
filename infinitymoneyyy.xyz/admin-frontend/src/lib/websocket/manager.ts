@@ -19,6 +19,8 @@ export const SUPPORT_MESSAGE_ANSWERED = 'support_message_answered';
 export const CONTACT_MESSAGE_CREATED = 'contact_message_created';
 export const CONTACT_MESSAGE_ANSWERED = 'contact_message_answered';
 export const STATS_UPDATED = 'stats_updated';
+export const WORKER_INVOICE_CREATED = 'worker_invoice_created';
+export const WORKER_SHIFT_UPDATED = 'worker_shift_updated';
 
 // Thread-based Support event constants
 export const THREAD_CREATED = 'thread_created';

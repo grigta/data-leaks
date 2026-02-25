@@ -10,12 +10,7 @@ export const load: PageLoad = async () => {
 		const state = get(authStore);
 		const user = state.user;
 
-		// Pure worker (worker_role=true, is_admin=false) -> redirect to /manual-ssn
-		if (user?.worker_role === true && user?.is_admin === false) {
-			throw redirect(302, '/manual-ssn');
-		} else {
-			throw redirect(302, '/dashboard');
-		}
+		throw redirect(302, '/profit-dashboard');
 	}
 
 	return {};

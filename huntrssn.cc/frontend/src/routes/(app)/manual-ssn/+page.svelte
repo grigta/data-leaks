@@ -406,7 +406,7 @@
 					<p class="text-sm text-muted-foreground">
 						{$t('search.manualSsn.subtitle')}
 					</p>
-					<div class="mt-2 rounded-md bg-muted px-3 py-2">
+					<div class="mt-2 border border-border bg-muted/50 rounded-lg px-3 py-2">
 						<p class="text-sm font-medium">
 							{$t('search.manualSsn.costInfo', { cost: MANUAL_SSN_COST.toFixed(2) })}
 						</p>
@@ -419,8 +419,8 @@
 						</div>
 					{:else if isMaintenanceMode}
 						<div class="flex flex-col items-center justify-center py-8 gap-4">
-							<div class="rounded-full bg-orange-100 p-4">
-								<Wrench class="h-12 w-12 text-orange-600" />
+							<div class="rounded-full bg-warning/10 p-4">
+								<Wrench class="h-12 w-12 text-warning" />
 							</div>
 							<div class="text-center space-y-2">
 								<h3 class="text-lg font-semibold">Технические работы</h3>
@@ -511,7 +511,7 @@
 						<Button
 							variant="default"
 							size="sm"
-							class="bg-green-600 hover:bg-green-700"
+							class="bg-primary text-primary-foreground hover:bg-primary/80"
 							onclick={handleMoveAllCompletedToOrders}
 							disabled={isMovingAll || isLoadingTickets}
 						>
@@ -557,7 +557,7 @@
 							</TableHeader>
 							<TableBody>
 								{#each myTickets as ticket (ticket.id)}
-									<TableRow class={ticket.status === 'completed' && !ticket.is_viewed ? 'bg-green-50 dark:bg-green-950/20' : ''}>
+									<TableRow class={ticket.status === 'completed' && !ticket.is_viewed ? 'border-l-2 border-l-primary bg-primary/5' : ''}>
 										<!-- Column 1: Actions -->
 										<TableCell class="py-2 px-2">
 											{#if ticket.status === 'completed'}
@@ -565,7 +565,7 @@
 													<Button
 														variant="outline"
 														size="sm"
-														class="h-8 w-8 p-0 border-green-500 bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700"
+														class="h-8 w-8 p-0 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
 														onclick={() => handleMoveToOrder(ticket.id)}
 														disabled={movingTickets.has(ticket.id)}
 														title="Отправить в корзину"

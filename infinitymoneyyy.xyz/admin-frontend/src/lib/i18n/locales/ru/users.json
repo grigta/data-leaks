@@ -1,0 +1,60 @@
+{
+	"title": "Пользователи",
+	"periods": {
+		"24h": "24ч",
+		"7d": "7д",
+		"30d": "30д",
+		"all": "Все"
+	},
+	"searchModes": {
+		"auto": "Авто",
+		"instant": "Инстант",
+		"manual": "Ручной"
+	},
+	"table": {
+		"user": "Юзер",
+		"price": "Цена",
+		"type": "Тип",
+		"totalProfit": "Общий профит",
+		"instProfit": "Инст профит",
+		"roiInst": "ROI инст",
+		"successInst": "% усп инст",
+		"manualProfit": "Ручной профит",
+		"roiManual": "ROI ручной",
+		"successManual": "% усп руч",
+		"deposit": "Депозит",
+		"balance": "Баланс",
+		"regDate": "Дата реги",
+		"addBal": "+бал",
+		"ban": "Бан"
+	},
+	"noUsers": "Пользователи не найдены",
+	"instantLabel": "Инстант (instant)",
+	"manualLabel": "Ручной (manual)",
+	"addBalance": {
+		"title": "Пополнить баланс",
+		"description": "Пополнение баланса пользователя <strong>{{username}}</strong>. Текущий баланс: {{balance}}",
+		"amount": "Сумма ($)",
+		"placeholder": "50.00",
+		"invalidAmount": "Введите корректную сумму",
+		"adding": "Пополнение...",
+		"add": "Пополнить"
+	},
+	"changePrice": {
+		"title": "Изменить цену",
+		"description": "Цена instant SSN для <strong>{{username}}</strong>",
+		"price": "Цена ($)",
+		"placeholder": "2.00",
+		"invalidPrice": "Введите корректную цену",
+		"updated": "Цена для {{username}} обновлена: ${{price}}"
+	},
+	"banUser": {
+		"title": "Забанить пользователя",
+		"description": "Вы собираетесь забанить <strong>{{username}}</strong>.",
+		"reason": "Причина бана",
+		"reasonPlaceholder": "Причина бана...",
+		"reasonRequired": "Укажите причину бана (мин. 3 символа)",
+		"banning": "Бан...",
+		"banButton": "Забанить"
+	}
+}

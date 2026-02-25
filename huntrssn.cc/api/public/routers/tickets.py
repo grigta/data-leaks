@@ -4,10 +4,12 @@ Handles ticket viewing for regular users.
 """
 
 import logging
+import os
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
+import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,9 @@ from api.common.database import get_postgres_session
 from api.common.models_postgres import ManualSSNTicket, TicketStatus, User, Order, OrderStatus, OrderType
 from api.common.pricing import MANUAL_SSN_PRICE, check_maintenance_mode, get_user_price
 from api.public.dependencies import get_current_user
+
+# Configuration for internal API calls
+ADMIN_API_INTERNAL_URL = os.getenv("ADMIN_API_INTERNAL_URL", "http://admin_api:8002")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -201,6 +206,31 @@ async def create_ticket(
         await db.refresh(new_ticket, ["user"])
 
         logger.info(f"Created ticket {new_ticket.id} for user {current_user.username}")
+
+        # Notify admin API via internal endpoint to broadcast to admins via WebSocket
+        try:
+            notify_data = {
+                "id": str(new_ticket.id),
+                "user_id": str(new_ticket.user_id),
+                "username": current_user.username,
+                "firstname": new_ticket.firstname,
+                "lastname": new_ticket.lastname,
+                "address": new_ticket.address,
+                "status": new_ticket.status.value,
+                "created_at": new_ticket.created_at.isoformat()
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{ADMIN_API_INTERNAL_URL}/internal/notify-ticket-created",
+                    json={"ticket_data": notify_data},
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as response:
+                    if response.status != 200:
+                        logger.error(f"Failed to notify Admin API: HTTP {response.status}")
+                    else:
+                        logger.info(f"Successfully notified Admin API about ticket {new_ticket.id}")
+        except Exception as notify_error:
+            logger.error(f"Error notifying Admin API about ticket creation: {notify_error}")
 
         return TicketResponse.from_ticket(new_ticket)
 
@@ -484,13 +514,17 @@ async def move_ticket_to_order(
             )
 
         # Step 3: Prepare order items from ticket data
+        from api.common.pricing import get_user_price_by_id, get_default_instant_ssn_price
+        default_instant_price = await get_default_instant_ssn_price(db)
+        user_price = await get_user_price_by_id(db, current_user.id, 'instant_ssn', default_instant_price)
+
         order_items = []
 
         # Base item with ticket metadata
         order_item = {
             "source": "manual_ticket",
             "ticket_id": str(ticket.id),
-            "price": "0.00",  # Already paid when creating ticket
+            "price": str(user_price),
             "firstname": ticket.firstname,
             "lastname": ticket.lastname,
             "address": ticket.address,
@@ -505,13 +539,12 @@ async def move_ticket_to_order(
         order_items.append(order_item)
 
         # Step 4: Create order
-        # Note: total_price is 0.00 since the ticket was already paid when created
         new_order = Order(
             user_id=current_user.id,
             items=order_items,
-            total_price=Decimal("0.00"),
+            total_price=user_price,
             status=OrderStatus.completed,
-            order_type=OrderType.manual_ssn,  # Manual SSN ticket processed by worker
+            order_type=OrderType.manual_ssn,
             is_viewed=False
         )
 

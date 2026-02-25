@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from api.common.database import get_postgres_session
 from api.common.models_postgres import User, Subscription, SubscriptionPlan
 from api.public.dependencies import get_current_user
+from api.public.websocket import publish_user_notification, WebSocketEventType
 
 
 router = APIRouter()
@@ -146,6 +147,14 @@ async def purchase_subscription(
 
         await db.commit()
         await db.refresh(subscription)
+        await db.refresh(current_user)
+
+        # Notify about balance change via WebSocket
+        await publish_user_notification(
+            str(current_user.id),
+            WebSocketEventType.BALANCE_UPDATED,
+            {"user_id": str(current_user.id), "new_balance": float(current_user.balance)}
+        )
 
         # Load plan relationship for response
         result = await db.execute(

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
+	import Crosshair from '@lucide/svelte/icons/crosshair';
 
 	type LogoSize = 'small' | 'default' | 'large';
 	type LogoVariant = 'full' | 'compact';
@@ -18,28 +19,24 @@
 		large: 'text-4xl'
 	};
 
-	const text = variant === 'full' ? 'Data-Leaks' : 'DL';
+	const iconSizeClasses = {
+		small: 'h-5 w-5',
+		default: 'h-6 w-6',
+		large: 'h-8 w-8'
+	};
 </script>
 
 <a
 	href="/"
 	class={cn(
-		'logo-text text-foreground font-michroma font-bold tracking-wider transition-all duration-300 hover:opacity-80',
+		'flex items-center gap-2 text-foreground font-heading font-bold tracking-wide hover:opacity-80 transition-colors duration-200',
 		sizeClasses[size],
 		className
 	)}
-	aria-label="Data-Leaks Home"
+	aria-label="Huntr Home"
 >
-	{text}
+	<Crosshair class={cn('text-primary flex-shrink-0', iconSizeClasses[size])} />
+	{#if variant === 'full'}
+		<span>Huntr</span>
+	{/if}
 </a>
-
-<style>
-	.logo-text {
-		text-decoration: none;
-		display: inline-block;
-	}
-
-	.logo-text:hover {
-		transform: scale(1.02);
-	}
-</style>

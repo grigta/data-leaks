@@ -6,6 +6,8 @@
 	"lookupSSN": "Lookup SSN",
 	"subscription": "DB Subscription",
 	"manualSSN": "Manual SSN",
+	"search": "Search",
+	"testSearch": "Test Search",
 	"orders": "Orders",
 	"cart": "Cart",
 	"api": "API",
@@ -15,6 +17,10 @@
 	"balance": "Balance",
 	"profile": "Profile",
 	"addBalance": "Add Balance",
+	"quickActions": "Quick Actions",
+	"deposit": "Deposit",
+	"coupon": "Coupon",
+	"accessCode": "Access Code",
 	"logout": "Logout",
 	"loggingOut": "Logging out..."
 }

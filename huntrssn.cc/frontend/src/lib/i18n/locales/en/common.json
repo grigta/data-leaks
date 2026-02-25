@@ -21,5 +21,10 @@
 	"error": "Error",
 	"warning": "Warning",
 	"info": "Info",
-	"toggleTheme": "Toggle theme"
+	"toggleTheme": "Toggle theme",
+	"justNow": "just now",
+	"minutesAgo": "min ago",
+	"hoursAgo": "h ago",
+	"yesterday": "yesterday",
+	"daysAgo": "d ago"
 }

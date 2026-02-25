@@ -401,3 +401,201 @@ class InstantSSNPurchaseResponse(BaseModel):
     new_balance: Optional[float] = Field(None, description="User's new balance after purchase")
 
 
+# =============================================================================
+# Debug Flow Models
+# =============================================================================
+
+class DebugFlowRequest(BaseModel):
+    """
+    Request model for Debug Flow search.
+    """
+    firstname: str = Field(..., min_length=2, max_length=MAX_NAME_LENGTH, description="First name")
+    lastname: str = Field(..., min_length=2, max_length=MAX_NAME_LENGTH, description="Last name")
+    address: str = Field(..., min_length=5, max_length=MAX_ADDRESS_LENGTH, description="Street address")
+    fullname: Optional[str] = Field(default=None, description="Original full name as entered by user")
+    provider: str = Field(default="searchbug", description="searchbug or whitepages")
+
+
+class BloomKeyResult(BaseModel):
+    """
+    Result for a single bloom key check.
+    """
+    key: str
+    type: str  # 'phone' or 'address'
+    found_in_db: bool
+    candidates_count: int
+
+
+class SearchKeyResult(BaseModel):
+    """
+    Result for a single search key check.
+    """
+    key: str
+    key_type: str  # 'Key1' - 'Key8'
+    matched: bool
+
+
+class CandidateResult(BaseModel):
+    """
+    Result for a single candidate from the database.
+    """
+    ssn: str
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    middlename: Optional[str] = None
+    dob: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    source_table: Optional[str] = None
+    matched_keys: List[str] = Field(default_factory=list)
+    candidate_keys: List[str] = Field(default_factory=list)
+    matched_keys_count: int = Field(default=0, description="Number of matched keys")
+    best_match_priority: Optional[int] = Field(default=None, description="Best match priority (1=highest, 16=lowest)")
+    input_address_match: bool = Field(default=False, description="Whether candidate address matches user input address")
+
+
+class DebugFlowResponse(BaseModel):
+    """
+    Response model for Debug Flow search.
+    """
+    # Provider used
+    provider: str = Field(default="searchbug")
+
+    # 1. SearchBug raw data
+    searchbug_data: dict = Field(default_factory=dict)
+
+    # 2. Bloom keys
+    bloom_keys_phone: List[BloomKeyResult] = Field(default_factory=list)
+    bloom_keys_address: List[BloomKeyResult] = Field(default_factory=list)
+    level1_candidates_count: int = 0
+
+    # 3. Search keys (query side)
+    query_keys: List[SearchKeyResult] = Field(default_factory=list)
+    searchbug_mn: Optional[str] = None
+    searchbug_dob_year: Optional[str] = None
+
+    # 4. Level 2 candidates with their keys
+    candidates_with_keys: List[CandidateResult] = Field(default_factory=list)
+
+    # 5. Final results
+    final_results: List[CandidateResult] = Field(default_factory=list)
+    final_count: int = 0
+
+
+class TestSearchResponse(BaseModel):
+    """
+    Response model for Test Search (simplified debug flow without debug info).
+    """
+    input_fullname: str = ""
+    input_address: str = ""
+    searchbug_dob: Optional[str] = None
+    ssn_results: List[str] = Field(default_factory=list)
+    count: int = 0
+
+
+class TestSearchHistoryItem(BaseModel):
+    """Single item in test search history."""
+    id: str
+    input_fullname: str
+    input_address: str
+    result_fullname: str
+    result_address: str
+    ssn: str
+    dob: Optional[str] = None
+    found: bool = True
+    status: str = 'done'  # processing, done, nf
+    search_time: Optional[float] = None  # search duration in seconds
+    created_at: str
+
+
+class TestSearchHistoryResponse(BaseModel):
+    """Response for test search history endpoint."""
+    history: List[TestSearchHistoryItem] = Field(default_factory=list)
+    total_requests: int = 0
+    successful_requests: int = 0
+    total_found: int = 0
+
+
+# =============================================================================
+# Search DB Models (Admin SSN lookup)
+# =============================================================================
+
+class SearchDBRequest(BaseModel):
+    """
+    Request model for direct SSN database search (admin only).
+    """
+    ssn: str = Field(..., min_length=4, max_length=MAX_SSN_LENGTH, description="SSN to search (full or last 4 digits)")
+
+
+class SearchDBRecord(BaseModel):
+    """
+    Single record from database search.
+    """
+    id: Optional[int] = None
+    ssn: str
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    middlename: Optional[str] = None
+    dob: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    source_table: Optional[str] = None
+
+
+class SearchDBResponse(BaseModel):
+    """
+    Response model for direct SSN database search.
+    """
+    query: str = Field(description="The SSN query that was searched")
+    results: List[SearchDBRecord] = Field(default_factory=list)
+    count: int = 0
+
+
+# =============================================================================
+# Unified Search Models
+# =============================================================================
+
+class UnifiedSearchRequest(BaseModel):
+    """
+    Request model for unified search (fullname + address).
+    Parses fullname into firstname + lastname automatically.
+    """
+    fullname: str = Field(..., min_length=3, max_length=200, description="Full name, e.g. 'John Smith'")
+    address: str = Field(..., min_length=5, max_length=MAX_ADDRESS_LENGTH, description="Street address")
+    source: Optional[str] = Field(default="web", max_length=20, description="Request source")
+
+    @field_validator('source')
+    @classmethod
+    def validate_source(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return "web"
+        allowed = {'web', 'telegram_bot', 'other'}
+        if v.lower() not in allowed:
+            return "other"
+        return v.lower()
+
+
+class UnifiedSearchResponse(BaseModel):
+    """
+    Response model for unified search.
+    """
+    success: bool
+    found: bool
+    results: List[InstantSSNResult] = Field(default_factory=list)
+    order_id: Optional[str] = None
+    charged_amount: Optional[float] = None
+    ticket_id: Optional[str] = None
+    ticket_status: Optional[str] = None
+    new_balance: Optional[float] = None
+    message: Optional[str] = None
+    searchbug_dob: Optional[str] = None
+
+

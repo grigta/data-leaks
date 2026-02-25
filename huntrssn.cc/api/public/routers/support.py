@@ -4,10 +4,12 @@ Handles support threads and messages for regular users.
 """
 
 import logging
+import os
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
+import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,9 @@ from api.common.database import get_postgres_session
 from api.common.models_postgres import SupportThread, SupportMessage, MessageStatus, MessageType, User, SupportMessageType
 from api.public.dependencies import get_current_user
 from api.public.websocket import ws_manager
-from api.admin.websocket import ws_manager as admin_ws_manager
+
+# Admin API internal URL for cross-service notifications
+ADMIN_API_INTERNAL_URL = os.getenv("ADMIN_API_INTERNAL_URL", "http://admin_api:8002")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -176,7 +180,19 @@ async def create_support_thread(
             "created_at": new_thread.created_at.isoformat()
         }
         await ws_manager.notify_thread_created(str(current_user.id), thread_data)
-        await admin_ws_manager.broadcast_thread_created(thread_data)
+
+        # Notify admin API via HTTP (cross-container communication)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{ADMIN_API_INTERNAL_URL}/internal/notify-thread-created",
+                    json={"thread_data": thread_data},
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Failed to notify Admin API about thread: HTTP {resp.status}")
+        except Exception as notify_error:
+            logger.error(f"Error notifying Admin API about thread creation: {notify_error}")
 
         return ThreadResponse.from_thread(new_thread, unread_count=0)
 
@@ -524,7 +540,19 @@ async def add_thread_message(
             "created_at": new_message.created_at.isoformat()
         }
         await ws_manager.notify_thread_message_added(str(current_user.id), message_data)
-        await admin_ws_manager.broadcast_thread_message_added(message_data)
+
+        # Notify admin API via HTTP (cross-container communication)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{ADMIN_API_INTERNAL_URL}/internal/notify-thread-message",
+                    json={"message_data": message_data},
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Failed to notify Admin API about thread message: HTTP {resp.status}")
+        except Exception as notify_error:
+            logger.error(f"Error notifying Admin API about thread message: {notify_error}")
 
         return MessageResponse.from_message(new_message)
 

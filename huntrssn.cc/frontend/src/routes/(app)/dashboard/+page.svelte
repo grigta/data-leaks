@@ -58,7 +58,7 @@
 
 <div class="space-y-6">
 	<!-- Page Header -->
-	<div class="flex items-center justify-center border-b border-border pb-4">
+	<div class="flex items-center justify-center">
 		<h1 class="text-2xl font-semibold">{$t('dashboard.title')}</h1>
 	</div>
 
@@ -66,7 +66,7 @@
 	<div class="space-y-4">
 		{#if isLoading}
 			{#each Array(4) as _, i}
-				<Card class="p-6 hover:bg-accent/50 transition-colors border">
+				<Card class="p-6 transition-colors">
 					<div class="flex items-start justify-between mb-3">
 						<Skeleton class="h-6 w-48" />
 						<Skeleton class="h-5 w-24" />
@@ -94,10 +94,10 @@
 			</Card>
 		{:else}
 			{#each news as newsItem (newsItem.id)}
-				<Card class="p-6 hover:bg-accent/50 transition-colors border space-y-3">
+				<Card class="p-6 hover:bg-accent hover:shadow-md transition-all duration-200 space-y-3">
 					<div class="flex items-start justify-between">
 						<h3 class="text-lg font-semibold">{newsItem.title}</h3>
-						<span class="text-sm text-muted-foreground">
+						<span class="text-xs text-muted-foreground">
 							{newsItem.created_at ? formatDate(newsItem.created_at) : '—'}
 						</span>
 					</div>

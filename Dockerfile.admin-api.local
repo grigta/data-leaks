@@ -1,0 +1,32 @@
+# Dockerfile for Admin API - local build
+FROM python:3.11-slim as builder
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY shared/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+FROM python:3.11-slim
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+
+COPY --chown=appuser:appuser infinitymoneyyy.xyz/api /app/api
+RUN rm -f /app/api/common 2>/dev/null || true
+COPY --chown=appuser:appuser shared/api/common /app/api/common
+COPY --chown=appuser:appuser huntrssn.cc/api/public /app/api/public
+COPY --chown=appuser:appuser shared/database /app/database
+
+USER appuser
+EXPOSE 8002
+
+CMD ["sh", "-c", "uvicorn api.admin.main:app --host 0.0.0.0 --port 8002 --workers ${UVICORN_WORKERS:-2} --timeout-keep-alive 5 --log-level info"]

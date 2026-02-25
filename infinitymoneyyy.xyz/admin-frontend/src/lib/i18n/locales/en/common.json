@@ -1,0 +1,32 @@
+{
+	"loading": "Loading...",
+	"save": "Save",
+	"saving": "Saving...",
+	"saved": "Saved",
+	"cancel": "Cancel",
+	"close": "Close",
+	"back": "Back",
+	"confirm": "Confirm",
+	"confirming": "Confirming...",
+	"refresh": "Refresh",
+	"delete": "Delete",
+	"search": "Search...",
+	"all": "All",
+	"noData": "No data",
+	"error": "Error",
+	"success": "Success",
+	"actions": "Actions",
+	"status": "Status",
+	"date": "Date",
+	"id": "ID",
+	"pagination": {
+		"page": "Page {{current}} of {{total}}",
+		"records": "{{total}} records, page {{current}} of {{totalPages}}",
+		"showing": "{{start}}-{{end}} of {{total}}"
+	},
+	"connected": "Connected",
+	"disconnected": "Disconnected",
+	"administrator": "Administrator",
+	"online": "Online",
+	"offline": "Offline"
+}

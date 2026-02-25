@@ -58,6 +58,7 @@ backups/
 # Node.js
 node_modules/
 *.tsbuildinfo
+.svelte-kit/
 
 # Logs
 *.log

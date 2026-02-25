@@ -1,0 +1,64 @@
+{
+	"title": "Тикеты",
+	"description": "Просмотр и управление запросами ручного поиска SSN",
+	"loadError": "Не удалось загрузить тикеты",
+	"filters": {
+		"all": "Все",
+		"pending": "Ожидающие",
+		"inProgress": "В обработке",
+		"completed": "Завершённые",
+		"rejected": "Отклонённые"
+	},
+	"statuses": {
+		"pending": "Ожидает",
+		"processing": "В обработке",
+		"completed": "Завершён",
+		"rejected": "Отклонён"
+	},
+	"table": {
+		"id": "ID",
+		"client": "Клиент",
+		"request": "Запрос",
+		"status": "Статус",
+		"worker": "Работник",
+		"date": "Дата",
+		"actions": "Действия"
+	},
+	"empty": "Тикеты не найдены",
+	"emptyWithStatus": "Тикеты со статусом \"{{status}}\" не найдены",
+	"detail": {
+		"title": "Детали тикета",
+		"id": "ID",
+		"status": "Статус",
+		"client": "Клиент",
+		"worker": "Работник",
+		"name": "Имя",
+		"address": "Адрес",
+		"response": "Ответ",
+		"created": "Создан",
+		"updated": "Обновлён"
+	},
+	"reply": {
+		"title": "Ответить на тикет",
+		"client": "Клиент:",
+		"request": "Запрос:",
+		"address": "Адрес:",
+		"complete": "Завершить",
+		"reject": "Отклонить"
+	},
+	"assign": {
+		"title": "Назначить работника",
+		"client": "Клиент:",
+		"request": "Запрос:",
+		"selectWorker": "Выберите работника",
+		"selectPlaceholder": "-- Выберите --",
+		"assignButton": "Назначить",
+		"selectError": "Выберите работника"
+	},
+	"messages": {
+		"assigned": "Тикет назначен",
+		"completed": "Тикет завершён",
+		"rejected": "Тикет отклонён",
+		"ssnRequired": "SSN обязателен для завершения"
+	}
+}

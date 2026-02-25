@@ -2,7 +2,7 @@
 SQLAlchemy 2.0 models for PostgreSQL database.
 """
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import String, Text, Numeric, DateTime, JSON, Enum, ForeignKey, CheckConstraint, Index, Boolean, func, UniqueConstraint, BigInteger, Integer
+from sqlalchemy import String, Text, Numeric, DateTime, JSON, Enum, ForeignKey, CheckConstraint, Index, Boolean, Float, func, UniqueConstraint, BigInteger, Integer
 from sqlalchemy.dialects import postgresql
 from uuid import uuid4, UUID
 from datetime import datetime
@@ -97,6 +97,12 @@ class CouponType(enum.Enum):
     registration_bonus = "registration_bonus"
 
 
+class InvoiceStatus(enum.Enum):
+    """Worker invoice status enumeration."""
+    pending = "pending"
+    paid = "paid"
+
+
 class MessageType(enum.Enum):
     """Message type enumeration for support threads."""
     user = "user"
@@ -127,6 +133,7 @@ class User(Base):
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ban_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     banned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    search_mode: Mapped[Optional[str]] = mapped_column(String(20), default='auto', nullable=True)
     instant_ssn_rules_accepted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     instant_ssn_rules_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     totp_secret: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -142,6 +149,13 @@ class User(Base):
     )
     invitation_code: Mapped[Optional[str]] = mapped_column(String(15), unique=True, nullable=True)
     invitation_bonus_received: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    load_percentage: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    wallet_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    wallet_network: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # 'erc20' | 'trc20'
+    worker_paused: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    worker_schedule: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    worker_timezone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    worker_status: Mapped[str] = mapped_column(String(20), default='idle', server_default='idle', nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -168,6 +182,9 @@ class User(Base):
     contact_threads: Mapped[List["ContactThread"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     contact_messages: Mapped[List["ContactMessage"]] = relationship(back_populates="user", foreign_keys="[ContactMessage.user_id]", cascade="all, delete-orphan")
     custom_pricing: Mapped[List["CustomPricing"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    worker_invoices: Mapped[List["WorkerInvoice"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
+    worker_shifts: Mapped[List["WorkerShift"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
+    test_search_history: Mapped[List["TestSearchHistory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     invited_users: Mapped[List["User"]] = relationship(back_populates="inviter", foreign_keys="[User.invited_by]")
     inviter: Mapped[Optional["User"]] = relationship(back_populates="invited_users", foreign_keys=[invited_by], remote_side=[id])
 
@@ -405,6 +422,7 @@ class ManualSSNTicket(Base):
     is_viewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     source: Mapped[RequestSource] = mapped_column(Enum(RequestSource), default=RequestSource.web, nullable=False)
     order_id: Mapped[Optional[UUID]] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('orders.id', ondelete='SET NULL'), nullable=True)
+    test_search_history_id: Mapped[Optional[UUID]] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('test_search_history.id', ondelete='SET NULL'), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -428,6 +446,7 @@ class ManualSSNTicket(Base):
         Index('idx_manual_ssn_tickets_is_viewed', 'is_viewed'),
         Index('idx_manual_ssn_tickets_user_viewed', 'user_id', 'is_viewed'),
         Index('idx_manual_ssn_tickets_order_id', 'order_id'),
+        Index('idx_manual_ssn_tickets_history_id', 'test_search_history_id'),
     )
 
 
@@ -824,3 +843,302 @@ class Subscription(Base):
     def is_valid(self) -> bool:
         """Check if subscription is currently valid."""
         return self.is_active and self.end_date > datetime.utcnow()
+
+
+class SearchBugCache(Base):
+    """
+    Cache for SearchBug API responses.
+
+    Stores responses from SearchBug API to avoid duplicate API calls for the same person.
+    Cache key is generated from normalized search parameters (firstname + lastname + address/zip).
+
+    TTL: 30 days by default (configurable via SEARCHBUG_CACHE_TTL_DAYS env var)
+    """
+    __tablename__ = "searchbug_cache"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    # Normalized search key (lowercase, stripped)
+    # Format: "firstname:lastname:address" or "firstname:lastname:zip:zipcode"
+    cache_key: Mapped[str] = mapped_column(String(500), unique=True, nullable=False, index=True)
+
+    # Original search parameters (for debugging/auditing)
+    search_params: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    # Full SearchBug API response
+    response_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    # Whether the search returned any data
+    data_found: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Cache metadata
+    hit_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_hit_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # Table constraints
+    __table_args__ = (
+        Index('idx_searchbug_cache_key', 'cache_key'),
+        Index('idx_searchbug_cache_expires', 'expires_at'),
+        Index('idx_searchbug_cache_data_found', 'data_found'),
+        Index('idx_searchbug_cache_created', 'created_at'),
+    )
+
+    @staticmethod
+    def generate_cache_key(firstname: str, lastname: str, address: str = None, zipcode: str = None) -> str:
+        """
+        Generate normalized cache key from search parameters.
+
+        Args:
+            firstname: First name
+            lastname: Last name
+            address: Street address (optional)
+            zipcode: ZIP code (optional)
+
+        Returns:
+            Normalized cache key string
+        """
+        import re
+
+        # Normalize names
+        fn = (firstname or '').lower().strip()
+        ln = (lastname or '').lower().strip()
+
+        if address:
+            # Normalize address: lowercase, remove extra spaces, keep alphanumeric
+            addr = re.sub(r'\s+', ' ', (address or '').lower().strip())
+            return f"{fn}:{ln}:addr:{addr}"
+        elif zipcode:
+            # Normalize zipcode: digits only
+            zip_clean = re.sub(r'\D', '', str(zipcode or ''))
+            return f"{fn}:{ln}:zip:{zip_clean}"
+        else:
+            return f"{fn}:{ln}"
+
+    def is_expired(self) -> bool:
+        """Check if cache entry has expired."""
+        return datetime.utcnow() > self.expires_at
+
+
+class ApiErrorLog(Base):
+    """API error log for tracking SearchBug and WhitePages API failures."""
+    __tablename__ = "api_error_logs"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    api_name: Mapped[str] = mapped_column(String(50), nullable=False)  # searchbug, whitepages
+    method: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. search_person_unified
+    error_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. NetworkError, TimeoutException
+    error_message: Mapped[str] = mapped_column(Text, nullable=False)
+    status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    request_params: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('idx_api_error_logs_api_name', 'api_name'),
+        Index('idx_api_error_logs_created_at', 'created_at'),
+        Index('idx_api_error_logs_api_created', 'api_name', 'created_at'),
+    )
+
+
+class TestSearchHistory(Base):
+    """History of test searches (fullz found/not found/processing)."""
+    __tablename__ = "test_search_history"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    input_fullname: Mapped[str] = mapped_column(String(200), nullable=False)
+    input_address: Mapped[str] = mapped_column(String(500), nullable=False)
+    result_fullname: Mapped[str] = mapped_column(String(200), nullable=False)
+    result_address: Mapped[str] = mapped_column(String(500), nullable=False)
+    ssn: Mapped[str] = mapped_column(String(11), nullable=False)
+    dob: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    found: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default='done', nullable=False)  # processing, done, nf
+    search_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # test_search, unified_search
+    search_time: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # search duration in seconds
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="test_search_history")
+
+    # Table constraints
+    __table_args__ = (
+        Index('idx_test_search_history_user_id', 'user_id'),
+        Index('idx_test_search_history_created_at', 'created_at'),
+        Index('idx_test_search_history_user_created', 'user_id', 'created_at'),
+        Index('idx_test_search_history_status', 'status'),
+    )
+
+
+class WorkerInvoice(Base):
+    """Worker invoice model for tracking payouts."""
+    __tablename__ = "worker_invoices"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    worker_id: Mapped[UUID] = mapped_column(
+        postgresql.UUID(as_uuid=True),
+        ForeignKey('users.id', ondelete='CASCADE'),
+        nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    wallet_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    wallet_network: Mapped[str] = mapped_column(String(20), nullable=False)  # 'erc20' | 'trc20'
+    status: Mapped[InvoiceStatus] = mapped_column(
+        Enum(InvoiceStatus), default=InvoiceStatus.pending, nullable=False
+    )
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # Relationships
+    worker: Mapped["User"] = relationship(back_populates="worker_invoices")
+
+    __table_args__ = (
+        CheckConstraint('amount > 0', name='check_invoice_amount_positive'),
+        Index('idx_worker_invoices_worker_id', 'worker_id'),
+        Index('idx_worker_invoices_status', 'status'),
+        Index('idx_worker_invoices_worker_status', 'worker_id', 'status'),
+        Index('idx_worker_invoices_created_at', 'created_at'),
+    )
+
+
+class WorkerShift(Base):
+    """Worker shift model for tracking work sessions."""
+    __tablename__ = "worker_shifts"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    worker_id: Mapped[UUID] = mapped_column(
+        postgresql.UUID(as_uuid=True),
+        ForeignKey('users.id', ondelete='CASCADE'),
+        nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    pause_duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    paused_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    tickets_completed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    tickets_rejected: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Relationships
+    worker: Mapped["User"] = relationship(back_populates="worker_shifts")
+
+    __table_args__ = (
+        Index('idx_worker_shifts_worker_id', 'worker_id'),
+        Index('idx_worker_shifts_started_at', 'started_at'),
+        Index('idx_worker_shifts_worker_started', 'worker_id', 'started_at'),
+        Index('idx_worker_shifts_ended_at', 'ended_at'),
+    )
+
+
+class AppSettings(Base):
+    """Key-value store for global application settings."""
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+# ── Test Polygon ──────────────────────────────────────────────────
+
+class TestPolygon(Base):
+    """A named test set containing fullz records for batch testing."""
+    __tablename__ = "test_polygons"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    records: Mapped[List["TestPolygonRecord"]] = relationship(back_populates="test", cascade="all, delete-orphan")
+    runs: Mapped[List["TestPolygonRun"]] = relationship(back_populates="test", cascade="all, delete-orphan")
+    creator: Mapped["User"] = relationship(foreign_keys=[created_by])
+
+    __table_args__ = (
+        Index('idx_test_polygons_created_by', 'created_by'),
+        Index('idx_test_polygons_created_at', 'created_at'),
+    )
+
+
+class TestPolygonRecord(Base):
+    """A single fullz record within a test set."""
+    __tablename__ = "test_polygon_records"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    test_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('test_polygons.id', ondelete='CASCADE'), nullable=False)
+    fullname: Mapped[str] = mapped_column(String(200), nullable=False)
+    address: Mapped[str] = mapped_column(String(500), nullable=False)
+    expected_ssn: Mapped[str] = mapped_column(String(11), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Relationships
+    test: Mapped["TestPolygon"] = relationship(back_populates="records")
+
+    __table_args__ = (
+        Index('idx_test_polygon_records_test_id', 'test_id'),
+    )
+
+
+class TestPolygonRun(Base):
+    """A single execution of a test set."""
+    __tablename__ = "test_polygon_runs"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    test_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('test_polygons.id', ondelete='CASCADE'), nullable=False)
+    flow_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # provider, db, strategy, etc.
+    status: Mapped[str] = mapped_column(String(20), default='pending', nullable=False)  # pending, running, completed, failed
+    total_records: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    processed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    matched_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    not_found_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    wrong_ssn_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    test: Mapped["TestPolygon"] = relationship(back_populates="runs")
+    results: Mapped[List["TestPolygonResult"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('idx_test_polygon_runs_test_id', 'test_id'),
+        Index('idx_test_polygon_runs_status', 'status'),
+        Index('idx_test_polygon_runs_created_at', 'created_at'),
+    )
+
+
+class TestPolygonResult(Base):
+    """Result of a single record within a test run."""
+    __tablename__ = "test_polygon_results"
+
+    id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('test_polygon_runs.id', ondelete='CASCADE'), nullable=False)
+    record_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), ForeignKey('test_polygon_records.id', ondelete='CASCADE'), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # match, not_found, wrong_ssn, error
+    found_ssn: Mapped[Optional[str]] = mapped_column(String(11), nullable=True)
+    best_method: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # e.g. "Key 2" or "FN+LN+DOB+ADDR"
+    matched_keys_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_candidates: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    debug_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # full debug flow response
+    search_time: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # Relationships
+    run: Mapped["TestPolygonRun"] = relationship(back_populates="results")
+    record: Mapped["TestPolygonRecord"] = relationship()
+
+    __table_args__ = (
+        Index('idx_test_polygon_results_run_id', 'run_id'),
+        Index('idx_test_polygon_results_record_id', 'record_id'),
+        Index('idx_test_polygon_results_status', 'status'),
+    )

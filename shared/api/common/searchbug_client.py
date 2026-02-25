@@ -11,6 +11,7 @@ import logging
 import asyncio
 from typing import Optional, Dict, Any, List, Tuple
 import httpx
+from api.common.api_error_logger import log_api_error
 
 
 # Configure logging
@@ -191,10 +192,12 @@ class SearchbugClient:
                 if 400 <= response.status_code < 500:
                     error_message = response.text
                     logger.error(f"Client error {response.status_code}: {error_message}")
-                    raise SearchbugAPIError(
+                    exc = SearchbugAPIError(
                         message=f"API error: {error_message}",
                         status_code=response.status_code
                     )
+                    await log_api_error('searchbug', '_make_request', exc, response.status_code, request_params)
+                    raise exc
 
                 # Handle 5xx errors - retry with backoff
                 if response.status_code >= 500:
@@ -214,10 +217,12 @@ class SearchbugClient:
                 if result.get('Status') == 'Error':
                     error_msg = result.get('Error', 'Unknown API error')
                     logger.error(f"SearchBug API error: {error_msg}")
-                    raise SearchbugAPIError(
+                    exc = SearchbugAPIError(
                         message=f"API error: {error_msg}",
                         status_code=200
                     )
+                    await log_api_error('searchbug', '_make_request', exc, 200, request_params)
+                    raise exc
 
                 logger.info(f"Request successful")
                 return result
@@ -232,25 +237,33 @@ class SearchbugClient:
                     await asyncio.sleep(backoff_delay)
                     continue
                 else:
-                    raise SearchbugAPIError(
+                    exc = SearchbugAPIError(
                         message=f"Network error after {self.max_retries} attempts: {str(e)}"
                     )
+                    await log_api_error('searchbug', '_make_request', exc, None, request_params)
+                    raise exc
 
             except httpx.TimeoutException as e:
                 logger.error(f"Request timeout: {str(e)}")
-                raise SearchbugAPIError(message=f"Request timeout: {str(e)}")
+                exc = SearchbugAPIError(message=f"Request timeout: {str(e)}")
+                await log_api_error('searchbug', '_make_request', exc, None, request_params)
+                raise exc
 
             except Exception as e:
                 if isinstance(e, (SearchbugAPIError, SearchbugRateLimitError, SearchbugNotFoundError)):
                     raise
                 logger.error(f"Unexpected error: {str(e)}")
-                raise SearchbugAPIError(message=f"Unexpected error: {str(e)}")
+                exc = SearchbugAPIError(message=f"Unexpected error: {str(e)}")
+                await log_api_error('searchbug', '_make_request', exc, None, request_params)
+                raise exc
 
         # Max retries exceeded
-        raise SearchbugRateLimitError(
+        exc = SearchbugRateLimitError(
             message=f"Rate limit exceeded after {self.max_retries} attempts",
             status_code=429
         )
+        await log_api_error('searchbug', '_make_request', exc, 429, request_params)
+        raise exc
 
     # ============================================
     # Search Methods
@@ -1069,6 +1082,40 @@ def create_searchbug_client() -> SearchbugClient:
         raise ValueError(
             "SEARCHBUG_PASSWORD environment variable is required. "
             "Please set it in your .env file."
+        )
+
+    return SearchbugClient(
+        co_code=co_code,
+        password=password,
+        api_url=api_url,
+        default_limit=default_limit
+    )
+
+
+async def create_searchbug_client_dynamic(db) -> SearchbugClient:
+    """Create SearchBug client with dynamic credentials from DB.
+
+    Reads credentials from AppSettings (cached 60s), falls back to env vars.
+    Use this instead of create_searchbug_client() when db session is available.
+    """
+    from api.common.pricing import get_searchbug_keys
+
+    keys = await get_searchbug_keys(db)
+
+    co_code = keys.get("searchbug_co_code") or os.getenv("SEARCHBUG_CO_CODE", "")
+    password = keys.get("searchbug_password") or os.getenv("SEARCHBUG_PASSWORD", "")
+    api_url = os.getenv("SEARCHBUG_API_URL", "https://data.searchbug.com/api/search.aspx")
+    default_limit = int(os.getenv("SEARCHBUG_DEFAULT_LIMIT", "100"))
+
+    if not co_code:
+        raise ValueError(
+            "SearchBug CO_CODE is not configured. "
+            "Set it in admin settings or SEARCHBUG_CO_CODE env var."
+        )
+    if not password:
+        raise ValueError(
+            "SearchBug password is not configured. "
+            "Set it in admin settings or SEARCHBUG_PASSWORD env var."
         )
 
     return SearchbugClient(

@@ -1,7 +1,7 @@
 """
-Data Manager Module for SQLite Database Operations
+Data Manager Module for SQLite and ClickHouse Database Operations
 
-This module provides functionality for managing individual records in the SQLite database.
+This module provides functionality for managing individual records in databases.
 It reuses the DataValidator class from csv_importer.py for data validation and connection
 functions from db_schema.py.
 
@@ -11,14 +11,50 @@ Main Features:
 - Delete records by SSN
 - Partial record updates
 - Data validation for all fields
+- Dual-write support for SQLite and ClickHouse
+
+Environment Variables:
+- ENABLE_CLICKHOUSE_WRITES: Set to 'true' to enable dual writes to ClickHouse
 """
 
+import os
 import logging
 import sqlite3
 from typing import Dict, List, Optional, Any
 
 from database.db_schema import get_connection, close_connection, validate_table_name, DEFAULT_DB_PATH
 from database.csv_importer import DataValidator
+
+# Check if ClickHouse writes are enabled
+ENABLE_CLICKHOUSE_WRITES = os.getenv('ENABLE_CLICKHOUSE_WRITES', 'false').lower() in ('true', '1', 'yes', 'on')
+
+# Lazy import for ClickHouse client
+_clickhouse_client = None
+_clickhouse_schema = None
+
+
+def _get_clickhouse_client():
+    """Lazy load ClickHouse client module."""
+    global _clickhouse_client
+    if _clickhouse_client is None:
+        try:
+            from database import clickhouse_client as ch_client
+            _clickhouse_client = ch_client
+        except ImportError:
+            _clickhouse_client = False
+    return _clickhouse_client if _clickhouse_client else None
+
+
+def _get_clickhouse_schema():
+    """Lazy load ClickHouse schema module."""
+    global _clickhouse_schema
+    if _clickhouse_schema is None:
+        try:
+            from database import clickhouse_schema as ch_schema
+            _clickhouse_schema = ch_schema
+        except ImportError:
+            _clickhouse_schema = False
+    return _clickhouse_schema if _clickhouse_schema else None
 
 
 # Setup module logger
@@ -33,16 +69,26 @@ class DataManager:
     from the SQLite database. All data is validated before database operations.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, enable_clickhouse: Optional[bool] = None):
         """
         Initialize DataManager with database path.
 
         Args:
             db_path: Path to SQLite database file. Uses DEFAULT_DB_PATH if not specified.
+            enable_clickhouse: Override for ENABLE_CLICKHOUSE_WRITES env var
         """
         self.db_path = db_path if db_path else DEFAULT_DB_PATH
         self.validator = DataValidator()
         self.logger = logging.getLogger(self.__class__.__name__)
+
+        # Determine if ClickHouse writes are enabled
+        if enable_clickhouse is not None:
+            self.enable_clickhouse = enable_clickhouse
+        else:
+            self.enable_clickhouse = ENABLE_CLICKHOUSE_WRITES
+
+        if self.enable_clickhouse:
+            self.logger.info("ClickHouse dual writes enabled")
 
     def _validate_record_data(self, record_data: Dict[str, Any], current_record: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -199,11 +245,20 @@ class DataManager:
             # Log successful operation
             self.logger.info(f"Successfully upserted record with SSN {validated_data['ssn']} in table {table_name} (ID: {record_id})")
 
+            # Dual write to ClickHouse if enabled
+            clickhouse_success = True
+            if self.enable_clickhouse:
+                validated_data['id'] = record_id or 0
+                clickhouse_success = self._write_to_clickhouse(validated_data, source_table=table_name)
+                if not clickhouse_success:
+                    self.logger.warning(f"ClickHouse dual write failed for SSN {validated_data['ssn']}")
+
             return {
                 'success': True,
                 'record_id': record_id,
                 'ssn': validated_data['ssn'],
-                'message': f"Record successfully upserted in {table_name}"
+                'message': f"Record successfully upserted in {table_name}",
+                'clickhouse_synced': clickhouse_success if self.enable_clickhouse else None
             }
 
         except ValueError as e:
@@ -341,11 +396,21 @@ class DataManager:
             # Log results
             self.logger.info(f"Bulk upsert in {table_name}: {successful_count} successful, {failed_count} failed out of {len(records)} total")
 
+            # Dual write to ClickHouse if enabled
+            clickhouse_count = 0
+            if self.enable_clickhouse and valid_records:
+                clickhouse_count = self._bulk_write_to_clickhouse(valid_records, source_table=table_name)
+                if clickhouse_count < len(valid_records):
+                    self.logger.warning(
+                        f"ClickHouse dual write: only {clickhouse_count}/{len(valid_records)} records synced"
+                    )
+
             return {
                 'total': len(records),
                 'successful': successful_count,
                 'failed': failed_count,
-                'failed_records': failed_records
+                'failed_records': failed_records,
+                'clickhouse_synced': clickhouse_count if self.enable_clickhouse else None
             }
 
         except FileNotFoundError as e:
@@ -691,6 +756,291 @@ class DataManager:
         except Exception as e:
             self.logger.error(f"Error checking record existence: {e}")
             return False
+
+    # =========================================================================
+    # ClickHouse Methods
+    # =========================================================================
+
+    def _write_to_clickhouse(self, record_data: Dict[str, Any], source_table: str = 'ssn_1') -> bool:
+        """
+        Write a record to ClickHouse (internal method).
+
+        Args:
+            record_data: Validated record data
+            source_table: Source table name for tracking
+
+        Returns:
+            bool: True if write succeeded, False otherwise
+        """
+        if not self.enable_clickhouse:
+            return True  # Not enabled, consider it a success
+
+        ch_client = _get_clickhouse_client()
+        ch_schema = _get_clickhouse_schema()
+
+        if not ch_client or not ch_schema:
+            self.logger.warning("ClickHouse client not available, skipping dual write")
+            return False
+
+        try:
+            # Prepare data for ClickHouse
+            ch_data = {
+                'id': record_data.get('id', 0),
+                'firstname': record_data.get('firstname') or '',
+                'lastname': record_data.get('lastname') or '',
+                'middlename': record_data.get('middlename'),
+                'address': record_data.get('address'),
+                'city': record_data.get('city'),
+                'state': record_data.get('state'),
+                'zip': record_data.get('zip'),
+                'phone': record_data.get('phone'),
+                'ssn': record_data['ssn'],
+                'dob': record_data.get('dob'),
+                'email': record_data.get('email'),
+                'source_table': source_table,
+            }
+
+            # Insert using batch method (single record)
+            ch_client.execute_batch(
+                ch_schema.SSN_TABLE,
+                [ch_data],
+                column_names=['id', 'firstname', 'lastname', 'middlename', 'address',
+                             'city', 'state', 'zip', 'phone', 'ssn', 'dob', 'email', 'source_table']
+            )
+
+            self.logger.debug(f"Successfully wrote record to ClickHouse: SSN {record_data['ssn']}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to write to ClickHouse: {e}")
+            return False
+
+    def _bulk_write_to_clickhouse(self, records: List[Dict[str, Any]], source_table: str = 'ssn_1') -> int:
+        """
+        Write multiple records to ClickHouse (internal method).
+
+        Args:
+            records: List of validated record data
+            source_table: Source table name for tracking
+
+        Returns:
+            int: Number of records successfully written
+        """
+        if not self.enable_clickhouse:
+            return len(records)  # Not enabled, consider all successful
+
+        ch_client = _get_clickhouse_client()
+        ch_schema = _get_clickhouse_schema()
+
+        if not ch_client or not ch_schema:
+            self.logger.warning("ClickHouse client not available, skipping bulk dual write")
+            return 0
+
+        try:
+            # Prepare data for ClickHouse
+            ch_data = []
+            for record in records:
+                ch_data.append({
+                    'id': record.get('id', 0),
+                    'firstname': record.get('firstname') or '',
+                    'lastname': record.get('lastname') or '',
+                    'middlename': record.get('middlename'),
+                    'address': record.get('address'),
+                    'city': record.get('city'),
+                    'state': record.get('state'),
+                    'zip': record.get('zip'),
+                    'phone': record.get('phone'),
+                    'ssn': record['ssn'],
+                    'dob': record.get('dob'),
+                    'email': record.get('email'),
+                    'source_table': source_table,
+                })
+
+            # Bulk insert
+            count = ch_client.execute_batch(
+                ch_schema.SSN_TABLE,
+                ch_data,
+                column_names=['id', 'firstname', 'lastname', 'middlename', 'address',
+                             'city', 'state', 'zip', 'phone', 'ssn', 'dob', 'email', 'source_table']
+            )
+
+            self.logger.info(f"Successfully wrote {count} records to ClickHouse")
+            return count
+
+        except Exception as e:
+            self.logger.error(f"Failed to bulk write to ClickHouse: {e}")
+            return 0
+
+    def upsert_record_clickhouse(self, record_data: Dict[str, Any], source_table: str = 'ssn_1') -> Dict[str, Any]:
+        """
+        Insert or update a record directly in ClickHouse.
+
+        Args:
+            record_data: Dictionary containing record fields
+            source_table: Source table name for tracking
+
+        Returns:
+            Dictionary with operation result
+        """
+        ch_client = _get_clickhouse_client()
+        ch_schema = _get_clickhouse_schema()
+
+        if not ch_client or not ch_schema:
+            return {
+                'success': False,
+                'error': 'ClickHouse client not available'
+            }
+
+        try:
+            # Validate record data
+            validated_data = self._validate_record_data(record_data)
+
+            # Write to ClickHouse
+            success = self._write_to_clickhouse(validated_data, source_table)
+
+            if success:
+                return {
+                    'success': True,
+                    'ssn': validated_data['ssn'],
+                    'message': 'Record successfully upserted in ClickHouse'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Failed to write to ClickHouse'
+                }
+
+        except ValueError as e:
+            self.logger.error(f"Validation error during ClickHouse upsert: {e}")
+            return {
+                'success': False,
+                'error': f"Validation error: {str(e)}"
+            }
+        except Exception as e:
+            self.logger.error(f"Unexpected error during ClickHouse upsert: {e}")
+            return {
+                'success': False,
+                'error': f"Unexpected error: {str(e)}"
+            }
+
+    def bulk_upsert_clickhouse(self, records: List[Dict[str, Any]], source_table: str = 'ssn_1') -> Dict[str, Any]:
+        """
+        Insert or update multiple records directly in ClickHouse.
+
+        Args:
+            records: List of dictionaries containing record fields
+            source_table: Source table name for tracking
+
+        Returns:
+            Dictionary with operation statistics
+        """
+        ch_client = _get_clickhouse_client()
+        ch_schema = _get_clickhouse_schema()
+
+        if not ch_client or not ch_schema:
+            return {
+                'success': False,
+                'error': 'ClickHouse client not available'
+            }
+
+        if not records:
+            return {
+                'total': 0,
+                'successful': 0,
+                'failed': 0,
+                'failed_records': []
+            }
+
+        # Validate all records first
+        valid_records = []
+        failed_count = 0
+        failed_records = []
+
+        for idx, record in enumerate(records):
+            try:
+                validated_data = self._validate_record_data(record)
+                valid_records.append(validated_data)
+            except (ValueError, Exception) as e:
+                failed_count += 1
+                failed_records.append({
+                    'record_index': idx,
+                    'ssn': record.get('ssn', 'N/A'),
+                    'error': str(e)
+                })
+
+        if not valid_records:
+            return {
+                'total': len(records),
+                'successful': 0,
+                'failed': failed_count,
+                'failed_records': failed_records
+            }
+
+        # Write to ClickHouse
+        successful = self._bulk_write_to_clickhouse(valid_records, source_table)
+
+        return {
+            'total': len(records),
+            'successful': successful,
+            'failed': failed_count + (len(valid_records) - successful),
+            'failed_records': failed_records
+        }
+
+    def delete_record_clickhouse(self, ssn: str) -> Dict[str, Any]:
+        """
+        Delete a record from ClickHouse by SSN.
+
+        Note: ClickHouse doesn't support efficient single-row deletes.
+        This uses ALTER TABLE DELETE which is asynchronous.
+
+        Args:
+            ssn: Social Security Number of record to delete
+
+        Returns:
+            Dictionary with operation result
+        """
+        ch_client = _get_clickhouse_client()
+        ch_schema = _get_clickhouse_schema()
+
+        if not ch_client or not ch_schema:
+            return {
+                'success': False,
+                'error': 'ClickHouse client not available'
+            }
+
+        try:
+            # Normalize SSN
+            normalized_ssn = self.validator.validate_ssn(ssn)
+            if normalized_ssn is None:
+                raise ValueError('Invalid SSN')
+
+            # Execute delete (this is asynchronous in ClickHouse)
+            ch_client.execute_command(
+                f"ALTER TABLE {ch_schema.SSN_TABLE} DELETE WHERE ssn = {{ssn:String}}",
+                parameters={"ssn": normalized_ssn}
+            )
+
+            self.logger.info(f"Initiated delete for SSN {normalized_ssn} in ClickHouse")
+
+            return {
+                'success': True,
+                'deleted': True,
+                'ssn': normalized_ssn,
+                'message': 'Delete initiated in ClickHouse (asynchronous)'
+            }
+
+        except ValueError as e:
+            self.logger.error(f"Validation error during ClickHouse delete: {e}")
+            return {
+                'success': False,
+                'error': f"Validation error: {str(e)}"
+            }
+        except Exception as e:
+            self.logger.error(f"Error during ClickHouse delete: {e}")
+            return {
+                'success': False,
+                'error': f"Error: {str(e)}"
+            }
 
 
 # Convenience functions for easy API access

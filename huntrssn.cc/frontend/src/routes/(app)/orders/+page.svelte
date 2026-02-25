@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getOrders, getOrderDetails, type OrderSummary, type OrderDetailResponse, type OrderItemResponse, type SSNRecord } from '$lib/api/client';
+	import { getOrders, getOrderDetails, getTestSearchHistory, type OrderSummary, type OrderDetailResponse, type OrderItemResponse, type SSNRecord, type TestSearchHistoryItem } from '$lib/api/client';
 	import { formatCurrency, formatDate, maskSSN, getStatusBadgeClass, formatDOBISO, formatSSN, formatPhone } from '$lib/utils';
-	import { ORDER_STATUSES } from '$lib/constants/orderStatuses';
 	import { markOrdersAsViewed } from '$lib/stores/orders';
 	import { t } from '$lib/i18n';
-	import type { OrderTypeFilter } from '$lib/types/orders';
 	import { ORDERS_PAGE_SIZE, ORDERS_FETCH_LIMIT, ORDERS_EXPORT_PAGE_SIZE } from '$lib/types/orders';
 
 	// Components
@@ -22,21 +20,11 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
-	import * as Select from '$lib/components/ui/select';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { TooltipProvider } from '$lib/components/ui/tooltip';
-	import * as Tabs from '$lib/components/ui/tabs';
 
 	// Icons (deep imports)
-	import Clock from '@lucide/svelte/icons/clock';
-	import CheckCircle from '@lucide/svelte/icons/check-circle';
-	import XCircle from '@lucide/svelte/icons/x-circle';
-	import Ban from '@lucide/svelte/icons/ban';
-	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import ChevronUp from '@lucide/svelte/icons/chevron-up';
 	import Download from '@lucide/svelte/icons/download';
-	import Filter from '@lucide/svelte/icons/filter';
-	import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import Copy from '@lucide/svelte/icons/copy';
@@ -47,7 +35,6 @@
 	let orders = $state<OrderSummary[]>([]);
 	let isLoading = $state(true);
 	let selectedStatus = $state<string>('all');
-	let selectedOrderType = $state<OrderTypeFilter>('all');
 	let currentPage = $state(0);
 	let pageSize = $state(ORDERS_PAGE_SIZE); // Показывать 50 товаров на странице
 	let expandedOrderId = $state<string | null>(null);
@@ -58,7 +45,11 @@
 	let selectedOrderIds = $state<Set<string>>(new Set());
 	let copyingItemIds = $state<Set<string>>(new Set()); // Track items being copied
 	let copiedItemIds = $state<Set<string>>(new Set()); // Track successfully copied items
-	let copiedCells = $state<Map<string, boolean>>(new Map()); // Track copied cells for tooltip
+	let copiedCell = $state<string | null>(null); // Track which cell shows "Copied"
+	let showCopyTooltip = $state(false); // Show tooltip on right-click row copy
+
+	// Search history items (from test_search_history table)
+	let searchHistoryItems = $state<TestSearchHistoryItem[]>([]);
 
 	// Derived values
 	let filteredOrders = $derived(
@@ -84,10 +75,19 @@
 
 	// Lifecycle
 	onMount(async () => {
-		await loadOrders();
+		await Promise.all([loadOrders(), loadSearchHistory()]);
 		// Mark all orders as viewed when page loads
 		await markOrdersAsViewed();
 	});
+
+	async function loadSearchHistory() {
+		try {
+			const data = await getTestSearchHistory();
+			searchHistoryItems = data.history.filter(h => h.found);
+		} catch (err) {
+			console.error('Failed to load search history:', err);
+		}
+	}
 
 	// Types for flattened items
 	interface FlattenedItem extends OrderItemResponse {
@@ -145,6 +145,33 @@
 		return grouped;
 	}
 
+	function formatDOBddmmyyyy(dob: string): string {
+		if (!dob) return '';
+		// YYYYMMDD (from DB)
+		if (/^\d{8}$/.test(dob)) {
+			const day = dob.substring(6, 8);
+			const month = dob.substring(4, 6);
+			const year = dob.substring(0, 4);
+			return `${day}/${month}/${year}`;
+		}
+		// YYYY-MM-DD
+		if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+			const [year, month, day] = dob.split('-');
+			return `${day}/${month}/${year}`;
+		}
+		// MM/DD/YYYY (from SearchBug)
+		if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dob)) {
+			const [month, day, year] = dob.split('/');
+			return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+		}
+		// MM-DD-YYYY
+		if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dob)) {
+			const [month, day, year] = dob.split('-');
+			return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+		}
+		return dob;
+	}
+
 	function formatFullAddress(details: SSNRecord): string {
 		// Combine address components into single string
 		const parts = [
@@ -169,22 +196,17 @@
 	}
 
 	function formatRecordForCopy(item: OrderItemResponse): string {
-		// Format record as tab-separated values for clipboard
-		if (!item.ssn_details) return '';
+		const firstname = item.firstname || item.ssn_details?.firstname || '';
+		const middlename = item.middlename || item.ssn_details?.middlename || '';
+		const lastname = item.lastname || item.ssn_details?.lastname || '';
+		const rawDob = item.dob || item.ssn_details?.dob || '';
+		const dob = rawDob ? formatDOBddmmyyyy(rawDob) : '';
+		const address = formatFullAddressFromItem(item);
+		const email = item.email || item.ssn_details?.email || '';
+		const phone = item.phone ? formatPhone(item.phone) : item.ssn_details?.phone ? formatPhone(item.ssn_details.phone) : '';
+		const ssn = item.ssn ? formatSSN(item.ssn) : '';
 
-		const details = item.ssn_details;
-		const fields = [
-			details.firstname || '',
-			details.middlename || '',
-			details.lastname || '',
-			details.dob ? formatDOBISO(details.dob) : '',
-			formatFullAddress(details),
-			details.email || '',
-			details.phone ? formatPhone(details.phone) : '',
-			item.ssn ? formatSSN(item.ssn) : ''
-		];
-
-		return fields.join('\t');
+		return [firstname, middlename, lastname, dob, address, email, phone, ssn].join('\t');
 	}
 
 	function csvEscape(value: string): string {
@@ -197,6 +219,31 @@
 		// Flatten all orders and their details into a single array of items
 		const flattened: FlattenedItem[] = [];
 
+		// Add search history items first (most recent first)
+		for (const h of searchHistoryItems) {
+			const flatItem: FlattenedItem = {
+				ssn_record_id: `history:${h.id}`,
+				ssn: h.ssn,
+				price: '0',
+				firstname: h.result_fullname || h.input_fullname,
+				lastname: '',
+				middlename: '',
+				address: h.result_address || h.input_address,
+				city: '',
+				state: '',
+				zip: '',
+				dob: h.dob || '',
+				email: '',
+				phone: '',
+				order_id: `search-${h.id}`,
+				order_date: h.created_at,
+				order_status: 'completed',
+				product_type: 'Search'
+			};
+			flattened.push(flatItem);
+		}
+
+		// Add order items
 		for (const order of orders) {
 			const details = orderDetails.get(order.id);
 			if (!details) continue;
@@ -223,13 +270,7 @@
 			isLoading = true;
 			errorMessage = '';
 			const status = selectedStatus === 'all' ? undefined : selectedStatus;
-			// Important: When selectedOrderType is 'all', we pass undefined to the API.
-			// This ensures the backend returns ALL order types without filtering:
-			// - instant_ssn (current)
-			// - manual_ssn (current)
-			// - reverse_ssn (deprecated but still present for historical orders)
-			const type = selectedOrderType === 'all' ? undefined : selectedOrderType;
-			orders = await getOrders(status, ORDERS_FETCH_LIMIT, 0, type);
+			orders = await getOrders(status, ORDERS_FETCH_LIMIT, 0);
 
 			// Автоматически загружать детали всех заказов
 			await loadAllOrderDetails();
@@ -269,7 +310,7 @@
 		orderDetails = newDetailsMap;
 	}
 
-	async function fetchAllOrders(status?: string, type?: OrderTypeFilter): Promise<OrderSummary[]> {
+	async function fetchAllOrders(status?: string): Promise<OrderSummary[]> {
 		// Paginate through API to fetch all orders
 		const pageSize = ORDERS_EXPORT_PAGE_SIZE;
 		let offset = 0;
@@ -278,7 +319,7 @@
 
 		while (hasMore) {
 			try {
-				const batch = await getOrders(status, pageSize, offset, type);
+				const batch = await getOrders(status, pageSize, offset);
 				if (batch.length === 0) {
 					hasMore = false;
 				} else {
@@ -309,13 +350,6 @@
 		await loadOrders();
 	}
 
-	async function handleOrderTypeChange(value: string) {
-		selectedOrderIds = new Set();
-		selectedOrderType = value;
-		currentPage = 0;
-		await loadOrders();
-	}
-
 	async function handleToggleExpand(order_id: string) {
 		if (expandedOrderId === order_id) {
 			expandedOrderId = null;
@@ -342,90 +376,46 @@
 		}
 	}
 
+	function formatItemBlock(item: OrderItemResponse): string {
+		const firstname = item.firstname || item.ssn_details?.firstname || '';
+		const middlename = item.middlename || item.ssn_details?.middlename || '';
+		const lastname = item.lastname || item.ssn_details?.lastname || '';
+		const fullname = [firstname, middlename, lastname].filter(Boolean).join(' ');
+		const address = formatFullAddressFromItem(item);
+		const ssn = item.ssn ? formatSSN(item.ssn) : '';
+		const rawDob = item.dob || item.ssn_details?.dob || '';
+		const dob = rawDob ? formatDOBddmmyyyy(rawDob) : '';
+		return `${fullname}\n${address}\n${ssn}\n${dob}`;
+	}
+
 	async function handleExport() {
 		try {
-			// Create CSV content with full order details
-			const headers = ['Order ID', 'Product Type', 'First', 'Middle', 'Last', 'DOB', 'Full Address', 'Email', 'Phone', 'SSN', 'Price'];
-			const rows: string[][] = [];
-
-			// Fetch all orders matching current filter
 			const status = selectedStatus === 'all' ? undefined : selectedStatus;
-			const type = selectedOrderType === 'all' ? undefined : selectedOrderType;
-			const allOrders = await fetchAllOrders(status, type);
-
-			// Get orders to export (selected or all filtered)
+			const allOrders = await fetchAllOrders(status);
 			const ordersToExport = selectedOrderIds.size > 0
 				? allOrders.filter(o => selectedOrderIds.has(o.id))
 				: allOrders;
 
-			// Collect orders that need details fetched
-			const ordersNeedingDetails = ordersToExport.filter(o => !orderDetails.has(o.id));
+			await fetchMissingDetails(ordersToExport);
 
-			// Fetch all missing details in parallel
-			if (ordersNeedingDetails.length > 0) {
-				const detailsPromises = ordersNeedingDetails.map(order =>
-					getOrderDetails(order.id).catch(error => {
-						console.error(`Failed to fetch details for order ${order.id}:`, error);
-						return null;
-					})
-				);
-
-				const detailsResults = await Promise.all(detailsPromises);
-
-				// Update cache with fetched details
-				const newDetailsMap = new Map(orderDetails);
-				ordersNeedingDetails.forEach((order, index) => {
-					if (detailsResults[index]) {
-						newDetailsMap.set(order.id, detailsResults[index]!);
-					}
-				});
-				orderDetails = newDetailsMap;
-			}
-
-			// Build rows from cached details
+			// Build CSV: 1 cell per fullz (block inside cell)
+			const blocks: string[] = [];
 			for (const order of ordersToExport) {
 				const details = orderDetails.get(order.id);
 				if (!details) continue;
-
-				// Group items by product type
-				const groupedItems = groupItemsByProductType(details.items);
-
-				// Add rows for each item
-				for (const [tableName, items] of groupedItems.entries()) {
-					const productType = getProductTypeLabel(tableName);
-
-					for (const item of items) {
-						if (!item.ssn_details) continue;
-
-						const row = [
-							order.id,
-							productType,
-							item.ssn_details.firstname || '',
-							item.ssn_details.middlename || '',
-							item.ssn_details.lastname || '',
-							item.ssn_details.dob ? formatDOBISO(item.ssn_details.dob) : '',
-							formatFullAddress(item.ssn_details),
-							item.ssn_details.email || '',
-							item.ssn_details.phone || '',
-							item.ssn ? formatSSN(item.ssn) : '',
-							item.price.toString()
-						];
-
-						rows.push(row);
-					}
+				for (const item of details.items) {
+					blocks.push(formatItemBlock(item));
 				}
 			}
 
-			// Escape all fields and create CSV content with BOM
-			const csvContent = '\uFEFF' + [headers, ...rows].map((row) => row.map(csvEscape).join(',')).join('\n');
+			const csvContent = '\uFEFF' + blocks.map(b => csvEscape(b)).join('\n');
 
-			// Create blob and download
 			const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
 			const ts = new Date().toISOString().replace(/:/g, '-');
-			a.download = `orders-details-${ts}.csv`;
+			a.download = `orders-${ts}.csv`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -436,92 +426,53 @@
 		}
 	}
 
+	async function fetchMissingDetails(ordersToExport: OrderSummary[]) {
+		const ordersNeedingDetails = ordersToExport.filter(o => !orderDetails.has(o.id));
+		if (ordersNeedingDetails.length === 0) return;
+
+		const detailsPromises = ordersNeedingDetails.map(order =>
+			getOrderDetails(order.id).catch(error => {
+				console.error(`Failed to fetch details for order ${order.id}:`, error);
+				return null;
+			})
+		);
+		const detailsResults = await Promise.all(detailsPromises);
+		const newDetailsMap = new Map(orderDetails);
+		ordersNeedingDetails.forEach((order, index) => {
+			if (detailsResults[index]) {
+				newDetailsMap.set(order.id, detailsResults[index]!);
+			}
+		});
+		orderDetails = newDetailsMap;
+	}
+
 	async function handleExportTxt() {
 		try {
-			// Create TXT content with full order details
-			let txtContent = 'ORDERS DETAILS\n\n';
-			txtContent += '='.repeat(140) + '\n\n';
-
-			// Fetch all orders matching current filter
 			const status = selectedStatus === 'all' ? undefined : selectedStatus;
-			const type = selectedOrderType === 'all' ? undefined : selectedOrderType;
-			const allOrders = await fetchAllOrders(status, type);
-
-			// Get orders to export (selected or all filtered)
+			const allOrders = await fetchAllOrders(status);
 			const ordersToExport = selectedOrderIds.size > 0
 				? allOrders.filter(o => selectedOrderIds.has(o.id))
 				: allOrders;
 
-			// Collect orders that need details fetched
-			const ordersNeedingDetails = ordersToExport.filter(o => !orderDetails.has(o.id));
+			await fetchMissingDetails(ordersToExport);
 
-			// Fetch all missing details in parallel
-			if (ordersNeedingDetails.length > 0) {
-				const detailsPromises = ordersNeedingDetails.map(order =>
-					getOrderDetails(order.id).catch(error => {
-						console.error(`Failed to fetch details for order ${order.id}:`, error);
-						return null;
-					})
-				);
-
-				const detailsResults = await Promise.all(detailsPromises);
-
-				// Update cache with fetched details
-				const newDetailsMap = new Map(orderDetails);
-				ordersNeedingDetails.forEach((order, index) => {
-					if (detailsResults[index]) {
-						newDetailsMap.set(order.id, detailsResults[index]!);
-					}
-				});
-				orderDetails = newDetailsMap;
-			}
-
-			// Build TXT content from cached details
+			const blocks: string[] = [];
 			for (const order of ordersToExport) {
 				const details = orderDetails.get(order.id);
 				if (!details) continue;
-
-				// Order header
-				txtContent += `ORDER: ${order.id.slice(0, 8)}... - ${formatDate(order.created_at)} - ${order.status.toUpperCase()}\n`;
-				txtContent += '='.repeat(140) + '\n\n';
-
-				// Group items by product type
-				const groupedItems = groupItemsByProductType(details.items);
-
-				// Add sections for each product type
-				for (const [tableName, items] of groupedItems.entries()) {
-					const productType = getProductTypeLabel(tableName);
-					txtContent += `${productType.toUpperCase()}:\n`;
-					txtContent += '-'.repeat(140) + '\n';
-
-					// Table header with proper spacing
-					const header = `${padRight('First', 12)} ${padRight('Middle', 10)} ${padRight('Last', 12)} ${padRight('DOB', 12)} ${padRight('Full Address', 35)} ${padRight('Email', 25)} ${padRight('Phone', 15)} SSN`;
-					txtContent += header + '\n';
-					txtContent += '-'.repeat(140) + '\n';
-
-					// Table rows
-					for (const item of items) {
-						if (!item.ssn_details) continue;
-
-						const row = `${padRight(item.ssn_details.firstname || '', 12)} ${padRight(item.ssn_details.middlename || '', 10)} ${padRight(item.ssn_details.lastname || '', 12)} ${padRight(item.ssn_details.dob ? formatDOBISO(item.ssn_details.dob) : '', 12)} ${padRight(formatFullAddress(item.ssn_details).slice(0, 34), 35)} ${padRight(item.ssn_details.email || '', 25)} ${padRight(item.ssn_details.phone || '', 15)} ${item.ssn ? formatSSN(item.ssn) : ''}`;
-						txtContent += row + '\n';
-					}
-
-					txtContent += '\n';
+				for (const item of details.items) {
+					blocks.push(formatItemBlock(item));
 				}
-
-				// Order total
-				txtContent += `Total: ${formatCurrency(details.total_price)}\n`;
-				txtContent += '\n\n';
 			}
 
-			// Create blob and download
+			const txtContent = blocks.join('\n\n') + '\n';
+
 			const blob = new Blob([txtContent], { type: 'text/plain' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
 			const ts = new Date().toISOString().replace(/:/g, '-');
-			a.download = `orders-details-${ts}.txt`;
+			a.download = `orders-${ts}.txt`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -530,11 +481,6 @@
 			console.error('Failed to export orders:', error);
 			errorMessage = $t('orders.messages.exportFailed');
 		}
-	}
-
-	// Helper function for padding text
-	function padRight(text: string, length: number): string {
-		return text.padEnd(length).slice(0, length);
 	}
 
 	function goToPage(page: number) {
@@ -608,6 +554,10 @@
 			const textToCopy = formatRecordForCopy(item);
 			await navigator.clipboard.writeText(textToCopy);
 
+			// Show tooltip
+			showCopyTooltip = true;
+			setTimeout(() => { showCopyTooltip = false; }, 1500);
+
 			// Set success state
 			copiedItemIds = new Set(copiedItemIds).add(itemKey);
 
@@ -629,70 +579,60 @@
 	}
 
 	async function copyCellValue(value: string, cellKey: string) {
-		// Don't copy if value is just a placeholder
 		if (value === '-') return;
-
 		try {
-			// Copy to clipboard
 			await navigator.clipboard.writeText(value);
-
-			// Show tooltip
-			copiedCells.set(cellKey, true);
-
-			// Hide tooltip after 2 seconds
+			copiedCell = cellKey;
 			setTimeout(() => {
-				copiedCells.delete(cellKey);
-				copiedCells = new Map(copiedCells); // Trigger reactivity
-			}, 2000);
+				if (copiedCell === cellKey) copiedCell = null;
+			}, 1000);
 		} catch (error) {
 			console.error('Failed to copy cell value:', error);
+		}
+	}
+
+	function formatRowForCopy(item: FlattenedItem): string {
+		const firstname = item.firstname || item.ssn_details?.firstname || '';
+		const middlename = item.middlename || item.ssn_details?.middlename || '';
+		const lastname = item.lastname || item.ssn_details?.lastname || '';
+		const dob = item.dob ? formatDOBddmmyyyy(item.dob) : item.ssn_details?.dob ? formatDOBddmmyyyy(item.ssn_details.dob) : '';
+		const address = formatFullAddressFromItem(item);
+		const email = item.email || item.ssn_details?.email || '';
+		const phone = item.phone ? formatPhone(item.phone) : item.ssn_details?.phone ? formatPhone(item.ssn_details.phone) : '';
+		const ssn = item.ssn ? formatSSN(item.ssn) : '';
+		return [firstname, middlename, lastname, dob, address, email, phone, ssn].join('\t');
+	}
+
+	async function handleRowRightClick(e: MouseEvent, item: FlattenedItem) {
+		e.preventDefault();
+		const text = formatRowForCopy(item);
+		if (!text) return;
+		try {
+			await navigator.clipboard.writeText(text);
+			showCopyTooltip = true;
+			setTimeout(() => { showCopyTooltip = false; }, 1500);
+		} catch (error) {
+			console.error('Failed to copy row:', error);
 		}
 	}
 </script>
 
 <TooltipProvider>
-<div class="w-full space-y-6 p-6">
+<div class="w-full space-y-6 p-6 pt-2">
+	<!-- Copy Tooltip (right-click) -->
+	{#if showCopyTooltip}
+		<div class="fixed top-16 right-4 z-50 bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg text-sm font-medium animate-tooltip-fade">
+			Row copied to clipboard
+		</div>
+	{/if}
+
 	<!-- Page Title -->
 	<div class="flex items-center justify-center">
 		<h1 class="text-3xl font-bold">{$t('orders.title')}</h1>
 	</div>
 
-	<!-- Order Type Tabs -->
-	<Tabs.Root value={selectedOrderType} onValueChange={handleOrderTypeChange}>
-		<Tabs.List class="grid w-full grid-cols-3">
-			<Tabs.Trigger value="all">{$t('orders.tabs.all')}</Tabs.Trigger>
-			<Tabs.Trigger value="instant_ssn">{$t('orders.tabs.instantSSN')}</Tabs.Trigger>
-			<Tabs.Trigger value="manual_ssn">{$t('orders.tabs.manualSSN')}</Tabs.Trigger>
-		</Tabs.List>
-
-		<Tabs.Content value={selectedOrderType}>
-		<!-- Filters and Actions Bar -->
+		<!-- Actions Bar -->
 		<div class="flex flex-wrap items-center justify-center gap-4 mt-4">
-			<!-- Status Filter -->
-			<Select.Root
-				onSelectedChange={(selected) => {
-					if (selected) {
-						handleStatusFilter(selected.value);
-					}
-				}}
-			>
-				<Select.Trigger class="w-[180px]">
-					<Filter class="mr-2 h-4 w-4" />
-					<Select.Value placeholder={$t('orders.filters.status')} />
-				</Select.Trigger>
-				<Select.Content>
-					{#each ORDER_STATUSES as status}
-						<Select.Item value={status.value}>{status.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-
-			<!-- Refresh Button -->
-			<Button variant="outline" onclick={handleRefresh} disabled={isLoading}>
-				<RefreshCw class={`mr-2 h-4 w-4${isLoading ? ' animate-spin' : ''}`} />
-				{$t('orders.actions.refresh')}
-			</Button>
-
 			<!-- Export Button -->
 			<Button variant="outline" onclick={handleExport} disabled={orders.length === 0}>
 				<Download class="mr-2 h-4 w-4" />
@@ -733,7 +673,7 @@
 					<Skeleton class="h-16 w-full" />
 				{/each}
 			</div>
-		{:else if orders.length === 0}
+		{:else if orders.length === 0 && searchHistoryItems.length === 0}
 			<!-- Empty State -->
 			<Card>
 				<CardContent class="flex flex-col items-center justify-center py-12">
@@ -744,13 +684,13 @@
 			</Card>
 		{:else}
 			<!-- Flat Items Table -->
-			<Card>
+			<Card class="mx-auto max-w-5xl">
 				<CardContent class="p-0">
 					<div class="w-full">
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead class="w-12">
+									<TableHead class="w-12 text-center">
 										<Checkbox
 											checked={isAllSelected}
 											indeterminate={isSomeSelected}
@@ -758,15 +698,11 @@
 											aria-label={$t('orders.table.selectAll')}
 										/>
 									</TableHead>
-									<TableHead>{$t('orders.table.firstName')}</TableHead>
-									<TableHead class="hidden md:table-cell">{$t('orders.table.middleName')}</TableHead>
-									<TableHead>{$t('orders.table.lastName')}</TableHead>
-									<TableHead>{$t('orders.table.ssn')}</TableHead>
-									<TableHead>{$t('orders.table.dob')}</TableHead>
-									<TableHead>{$t('orders.table.fullAddress')}</TableHead>
-									<TableHead>{$t('orders.table.emails')}</TableHead>
-									<TableHead>{$t('orders.table.phones')}</TableHead>
-									<TableHead class="text-center">{$t('orders.table.actions')}</TableHead>
+									<TableHead class="w-12 text-center"></TableHead>
+									<TableHead class="text-center">Full Name</TableHead>
+									<TableHead class="text-center">Full Address</TableHead>
+									<TableHead class="text-center">SSN</TableHead>
+									<TableHead class="text-center">DOB</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -774,104 +710,69 @@
 									{@const itemKey = `${item.order_id}-${index}`}
 									{@const isCopying = copyingItemIds.has(itemKey)}
 									{@const isCopied = copiedItemIds.has(itemKey)}
-									<TableRow>
-										<TableCell class="w-12">
+									{@const firstname = item.firstname || item.ssn_details?.firstname || ''}
+									{@const middlename = item.middlename || item.ssn_details?.middlename || ''}
+									{@const lastname = item.lastname || item.ssn_details?.lastname || ''}
+									{@const fullName = [firstname, middlename, lastname].filter(Boolean).join(' ') || '-'}
+									{@const fullAddress = formatFullAddressFromItem(item)}
+									{@const dob = item.dob ? formatDOBddmmyyyy(item.dob) : item.ssn_details?.dob ? formatDOBddmmyyyy(item.ssn_details.dob) : '-'}
+									<TableRow oncontextmenu={(e) => handleRowRightClick(e, item)}>
+										<TableCell class="w-12 text-center">
 											<Checkbox
 												checked={selectedOrderIds.has(item.order_id)}
 												onCheckedChange={(checked) => handleSelectOrder(item.order_id, checked === true)}
 												aria-label="Select order"
 											/>
 										</TableCell>
-										{@const firstname = item.firstname || item.ssn_details?.firstname || '-'}
-										{@const middlename = item.middlename || item.ssn_details?.middlename || '-'}
-										{@const lastname = item.lastname || item.ssn_details?.lastname || '-'}
-										{@const dob = item.dob ? formatDOBISO(item.dob) : item.ssn_details?.dob ? formatDOBISO(item.ssn_details.dob) : '-'}
-										{@const fullAddress = formatFullAddressFromItem(item)}
-										{@const email = item.email || item.ssn_details?.email || '-'}
-										{@const phone = item.phone ? formatPhone(item.phone) : item.ssn_details?.phone ? formatPhone(item.ssn_details.phone) : '-'}
-
-										<TableCell class="text-sm relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(firstname, `${itemKey}-firstname`)}>
-											{firstname}
-											{#if copiedCells.get(`${itemKey}-firstname`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="text-sm hidden md:table-cell relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(middlename, `${itemKey}-middlename`)}>
-											{middlename}
-											{#if copiedCells.get(`${itemKey}-middlename`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="text-sm relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(lastname, `${itemKey}-lastname`)}>
-											{lastname}
-											{#if copiedCells.get(`${itemKey}-lastname`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(formatSSN(item.ssn), `${itemKey}-ssn`)}>
-											<code class="code-block text-xs">
-												{formatSSN(item.ssn)}
-											</code>
-											{#if copiedCells.get(`${itemKey}-ssn`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="text-sm relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(dob, `${itemKey}-dob`)}>
-											{dob}
-											{#if copiedCells.get(`${itemKey}-dob`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="text-sm relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(fullAddress, `${itemKey}-address`)}>
-											{fullAddress}
-											{#if copiedCells.get(`${itemKey}-address`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="text-sm relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(email, `${itemKey}-email`)}>
-											{email}
-											{#if copiedCells.get(`${itemKey}-email`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell class="text-sm relative cursor-pointer hover:bg-primary/5 hover:ring-1 hover:ring-primary/20 transition-all duration-150" onclick={() => copyCellValue(phone, `${itemKey}-phone`)}>
-											{phone}
-											{#if copiedCells.get(`${itemKey}-phone`)}
-												<span class="absolute inset-0 flex items-center justify-center bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs rounded pointer-events-none animate-fade">
-													Copied
-												</span>
-											{/if}
-										</TableCell>
-										<TableCell>
+										<!-- Copy Button -->
+										<TableCell class="text-center">
 											<Button
 												variant="ghost"
 												size="sm"
 												onclick={() => handleCopyRecord(itemKey, item)}
 												disabled={isCopying}
-												class="h-8 w-8 p-0"
+												class="h-8 w-8 p-0 mx-auto"
 											>
 												{#if isCopying}
 													<Loader2 class="h-4 w-4 animate-spin" />
 												{:else if isCopied}
-													<Check class="h-4 w-4 text-green-500" />
+													<Check class="h-4 w-4 text-primary" />
 												{:else}
 													<Copy class="h-4 w-4" />
 												{/if}
 											</Button>
+										</TableCell>
+										<!-- Full Name -->
+										<TableCell
+											class="cursor-pointer text-center text-sm transition-all duration-150"
+											onclick={() => copyCellValue(fullName, `${itemKey}-name`)}
+										>
+											{copiedCell === `${itemKey}-name` ? 'Copied' : fullName}
+										</TableCell>
+										<!-- Full Address -->
+										<TableCell
+											class="cursor-pointer text-center text-sm transition-all duration-150"
+											onclick={() => copyCellValue(fullAddress, `${itemKey}-address`)}
+										>
+											{copiedCell === `${itemKey}-address` ? 'Copied' : fullAddress}
+										</TableCell>
+										<!-- SSN -->
+										<TableCell
+											class="cursor-pointer text-center transition-all duration-150"
+											onclick={() => copyCellValue(formatSSN(item.ssn), `${itemKey}-ssn`)}
+										>
+											{#if copiedCell === `${itemKey}-ssn`}
+												<span class="text-sm">Copied</span>
+											{:else}
+												<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{formatSSN(item.ssn)}</code>
+											{/if}
+										</TableCell>
+										<!-- DOB -->
+										<TableCell
+											class="cursor-pointer text-center text-sm transition-all duration-150"
+											onclick={() => copyCellValue(dob, `${itemKey}-dob`)}
+										>
+											{copiedCell === `${itemKey}-dob` ? 'Copied' : dob}
 										</TableCell>
 									</TableRow>
 								{/each}
@@ -884,7 +785,7 @@
 			<!-- Pagination -->
 			{#if totalPages > 1}
 				<div class="flex items-center justify-between">
-					<div class="text-sm text-gray-600">
+					<div class="text-sm text-muted-foreground">
 						{$t('orders.pagination.page').replace('{{current}}', String(currentPage + 1)).replace('{{total}}', String(totalPages))}
 					</div>
 					<div class="flex gap-2">
@@ -902,32 +803,30 @@
 				</div>
 			{/if}
 		{/if}
-		</Tabs.Content>
-	</Tabs.Root>
-</div>
+	</div>
 </TooltipProvider>
 
 <style>
-	@keyframes fade {
+	@keyframes tooltip-fade {
 		0% {
 			opacity: 0;
-			transform: scale(0.95);
+			transform: translateY(-8px);
 		}
-		10% {
+		15% {
 			opacity: 1;
-			transform: scale(1);
+			transform: translateY(0);
 		}
-		90% {
+		85% {
 			opacity: 1;
-			transform: scale(1);
+			transform: translateY(0);
 		}
 		100% {
 			opacity: 0;
-			transform: scale(0.95);
+			transform: translateY(-8px);
 		}
 	}
 
-	:global(.animate-fade) {
-		animation: fade 2s ease-in-out;
+	:global(.animate-tooltip-fade) {
+		animation: tooltip-fade 1.5s ease-in-out;
 	}
 </style>

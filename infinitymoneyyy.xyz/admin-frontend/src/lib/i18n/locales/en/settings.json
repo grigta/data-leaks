@@ -1,0 +1,14 @@
+{
+	"title": "Settings",
+	"searchFlow": {
+		"title": "Search Flow",
+		"updated": "Updated: {{date}}",
+		"label": "Active search flow",
+		"placeholder": "Select flow",
+		"allFlows": "All available flows",
+		"active": "Active",
+		"selected": "Selected",
+		"changingFrom": "Changing from <strong>{{from}}</strong> to <strong>{{to}}</strong>",
+		"saved": "Search flow updated"
+	}
+}

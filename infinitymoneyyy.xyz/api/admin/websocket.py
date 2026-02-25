@@ -32,6 +32,8 @@ class WebSocketEventType:
     CONTACT_THREAD_MESSAGE_ADDED = "contact_thread_message_added"
     CONTACT_THREAD_STATUS_UPDATED = "contact_thread_status_updated"
     CONTACT_THREAD_MESSAGES_READ = "contact_thread_messages_read"
+    # Worker invoice events
+    WORKER_INVOICE_CREATED = "worker_invoice_created"
     # DEPRECATED: Old support message events (kept for backward compatibility)
     SUPPORT_MESSAGE_CREATED = "support_message_created"
     SUPPORT_MESSAGE_ANSWERED = "support_message_answered"
@@ -493,6 +495,14 @@ class WebSocketManager:
         message_id = message_data.get('id', 'unknown')
         logger.info(f"Contact message updated event broadcasted for message {message_id}")
         await self.broadcast_to_admins(WebSocketEventType.CONTACT_MESSAGE_UPDATED, message_data)
+
+    def get_online_worker_ids(self) -> List[str]:
+        """Return list of user IDs for currently connected workers."""
+        return list(self.worker_connections.keys())
+
+    def is_worker_online(self, user_id: str) -> bool:
+        """Check if a specific worker is currently connected."""
+        return user_id in self.worker_connections
 
     def get_connection_stats(self) -> dict:
         """

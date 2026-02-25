@@ -21,5 +21,10 @@
 	"error": "Ошибка",
 	"warning": "Предупреждение",
 	"info": "Информация",
-	"toggleTheme": "Переключить тему"
+	"toggleTheme": "Переключить тему",
+	"justNow": "только что",
+	"minutesAgo": "мин назад",
+	"hoursAgo": "ч назад",
+	"yesterday": "вчера",
+	"daysAgo": "дн назад"
 }

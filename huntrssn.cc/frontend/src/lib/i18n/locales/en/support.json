@@ -1,7 +1,8 @@
 {
-  "title": "Support Chat",
+  "title": "Support",
   "description": "Ask questions and get help from our support team",
   "newThread": "New Thread",
+  "newTicket": "New Ticket",
   "noThreads": "No active threads",
   "noSubject": "No subject",
   "subject": "Subject",
@@ -25,7 +26,16 @@
   "pending": "Pending",
   "answered": "Answered",
   "closed": "Closed",
+  "pendingColumn": "Awaiting Response",
+  "answeredColumn": "Answered",
+  "closedColumn": "Closed",
+  "ticketDetail": "Ticket Details",
+  "replyPlaceholder": "Type your reply...",
+  "noTicketsInColumn": "No tickets",
   "sendSuccess": "Message sent successfully",
   "sendError": "Failed to send message",
-  "loadError": "Failed to load data"
+  "loadError": "Failed to load data",
+  "today": "Today",
+  "you": "You",
+  "supportTeam": "Support"
 }

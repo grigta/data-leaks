@@ -1,0 +1,35 @@
+{
+	"filters": {
+		"all": "All",
+		"completed": "Completed",
+		"pending": "Pending",
+		"failed": "Failed",
+		"cancelled": "Cancelled"
+	},
+	"ordersCount": "{{count}} orders",
+	"noOrders": "No orders found",
+	"table": {
+		"id": "#",
+		"status": "Status",
+		"type": "Type",
+		"user": "User",
+		"price": "Price",
+		"cost": "Cost",
+		"profit": "Profit",
+		"date": "Date"
+	},
+	"detail": {
+		"title": "Order Details",
+		"orderId": "Order ID",
+		"status": "Status",
+		"type": "Type",
+		"user": "User",
+		"userId": "User ID",
+		"date": "Date",
+		"clientPrice": "Client Price",
+		"cost": "Cost ({{count}} items)",
+		"profit": "Profit",
+		"items": "Items ({{count}})"
+	},
+	"pagination": "{{count}} orders, page {{current}} of {{total}}"
+}

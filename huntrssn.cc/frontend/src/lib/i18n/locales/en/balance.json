@@ -16,6 +16,7 @@
 	"paymentStatus": "Status",
 	"copyAddress": "Copy Address",
 	"addressCopied": "Address copied!",
+	"transactionCount": "Transactions",
 	"transactionHistory": "Transaction History",
 	"noTransactions": "No transactions yet",
 	"table": {

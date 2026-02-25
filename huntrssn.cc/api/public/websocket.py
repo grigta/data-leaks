@@ -28,6 +28,8 @@ class WebSocketEventType:
     CONTACT_THREAD_MESSAGE_ADDED = "contact_thread_message_added"
     CONTACT_THREAD_STATUS_UPDATED = "contact_thread_status_updated"
     CONTACT_THREAD_MESSAGES_READ = "contact_thread_messages_read"
+    # Balance events
+    BALANCE_UPDATED = "balance_updated"
     # DEPRECATED: Old support message events (kept for backward compatibility)
     SUPPORT_MESSAGE_CREATED = "support_message_created"
     SUPPORT_MESSAGE_ANSWERED = "support_message_answered"
@@ -137,7 +139,7 @@ class PublicWebSocketManager:
             websocket = self.user_connections[user_id]
             try:
                 await websocket.send_json(message)
-                logger.debug(f"Sent {event_type} to user {user_id}")
+                logger.info(f"Sent {event_type} to user {user_id} via WebSocket")
             except WebSocketDisconnect:
                 logger.warning(f"User {user_id} disconnected during send")
                 self.disconnect(user_id)
@@ -145,7 +147,8 @@ class PublicWebSocketManager:
                 logger.error(f"Error sending message to user {user_id}: {e}")
                 self.disconnect(user_id)
         else:
-            logger.debug(f"User {user_id} not connected, skipping send of {event_type}")
+            connected_users = list(self.user_connections.keys())
+            logger.info(f"User {user_id} not connected on this worker, skipping {event_type}. Connected users: {connected_users}")
 
     async def connect_bot(self, websocket: WebSocket, connection_id: str) -> None:
         """
@@ -412,6 +415,20 @@ class PublicWebSocketManager:
         if user_id:
             await self.send_to_user(str(user_id), WebSocketEventType.CONTACT_MESSAGE_ANSWERED, message_data)
 
+    async def notify_balance_updated(self, user_id: str, new_balance: float) -> None:
+        """
+        Notify a user about their balance change.
+
+        Args:
+            user_id: User's ID
+            new_balance: New balance value
+        """
+        logger.info(f"Notifying user {user_id} about balance update: ${new_balance}")
+        await self.send_to_user(user_id, WebSocketEventType.BALANCE_UPDATED, {
+            "user_id": user_id,
+            "new_balance": new_balance
+        })
+
     def get_connection_stats(self) -> dict:
         """
         Get current connection statistics.
@@ -429,3 +446,57 @@ class PublicWebSocketManager:
 # Singleton instance
 public_ws_manager = PublicWebSocketManager()
 ws_manager = public_ws_manager  # Alias for compatibility
+
+
+# =============================================================================
+# Redis pub/sub for cross-worker WebSocket notifications
+# =============================================================================
+import asyncio
+import json
+import os
+import redis.asyncio as aioredis
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+REDIS_WS_CHANNEL = "ws:user_notify"
+
+
+async def publish_user_notification(user_id: str, event_type: str, data: dict):
+    """Publish a notification to Redis so ALL workers can deliver it."""
+    try:
+        r = aioredis.from_url(REDIS_URL)
+        message = json.dumps({"user_id": user_id, "event_type": event_type, "data": data})
+        await r.publish(REDIS_WS_CHANNEL, message)
+        await r.aclose()
+        logger.info(f"Published {event_type} for user {user_id} to Redis")
+    except Exception as e:
+        logger.error(f"Error publishing to Redis: {e}")
+        # Fallback to direct send (works if user happens to be on this worker)
+        await public_ws_manager.send_to_user(user_id, event_type, data)
+
+
+async def start_redis_subscriber():
+    """Background task: subscribe to Redis channel, forward to local WebSocket connections."""
+    while True:
+        try:
+            r = aioredis.from_url(REDIS_URL)
+            pubsub = r.pubsub()
+            await pubsub.subscribe(REDIS_WS_CHANNEL)
+            logger.info(f"Redis WS subscriber started on channel {REDIS_WS_CHANNEL}")
+
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    try:
+                        payload = json.loads(message["data"])
+                        user_id = payload["user_id"]
+                        event_type = payload["event_type"]
+                        event_data = payload["data"]
+                        logger.info(f"Redis subscriber received {event_type} for user {user_id}")
+                        await public_ws_manager.send_to_user(user_id, event_type, event_data)
+                    except Exception as e:
+                        logger.error(f"Error processing Redis WS message: {e}")
+        except asyncio.CancelledError:
+            logger.info("Redis WS subscriber cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Redis WS subscriber error: {e}, reconnecting in 3s...")
+            await asyncio.sleep(3)

@@ -2,6 +2,9 @@
 Admin authentication router with 2FA support.
 """
 import pyotp
+import qrcode
+import io
+import base64
 from datetime import timedelta, datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -28,7 +31,6 @@ from api.admin.dependencies import (
     oauth2_scheme_admin,
     get_current_admin_user,
     get_current_admin_user_optional,
-    get_current_admin_or_worker_user
 )
 from api.admin.websocket import ws_manager
 
@@ -47,7 +49,7 @@ class AdminUserResponse(BaseModel):
 
 @router.get("/me", response_model=AdminUserResponse)
 async def get_admin_me(
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Get current authenticated admin or worker user information.
@@ -72,9 +74,10 @@ class TwoFactorVerifyRequest(BaseModel):
 
 
 class TwoFactorSetupResponse(BaseModel):
-    """2FA setup response with provisioning URI."""
+    """2FA setup response with provisioning URI and QR code."""
     secret: str
     provisioning_uri: str
+    qr_code: str
     message: str
 
 
@@ -175,11 +178,11 @@ async def admin_login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if user has admin or worker privileges
-    if not user.is_admin and not user.worker_role:
+    # Check if user has admin privileges
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access forbidden: Admin or worker privileges required"
+            detail="Access forbidden: Admin privileges required"
         )
 
     # If 2FA is enabled, return temporary token
@@ -305,6 +308,12 @@ async def setup_two_factor(
         issuer_name="SSN Admin Portal"
     )
 
+    # Generate QR code as base64 PNG
+    qr = qrcode.make(provisioning_uri)
+    buf = io.BytesIO()
+    qr.save(buf, format="PNG")
+    qr_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
     # Store secret in database so it persists across requests
     current_user.totp_secret = secret
     await db.commit()
@@ -313,6 +322,7 @@ async def setup_two_factor(
     return TwoFactorSetupResponse(
         secret=secret,
         provisioning_uri=provisioning_uri,
+        qr_code=f"data:image/png;base64,{qr_base64}",
         message="Scan the QR code with your authenticator app and confirm with a code"
     )
 

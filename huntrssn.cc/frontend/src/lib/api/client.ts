@@ -110,6 +110,7 @@ export interface UserResponse {
   jabber?: string;
   balance: number;
   access_code?: string;
+  is_admin?: boolean;
   is_banned?: boolean;
   ban_reason?: string;
   banned_at?: string;
@@ -117,6 +118,7 @@ export interface UserResponse {
   invitation_code?: string;
   invited_by?: string;
   invitation_bonus_received?: boolean;
+  search_price?: number;
   created_at: string;
 }
 
@@ -1246,6 +1248,164 @@ export const getMySubscription = async (): Promise<SubscriptionResponse | null> 
 
 export const checkSubscriptionAccess = async (): Promise<CheckAccessResponse> => {
   const response = await apiClient.get<CheckAccessResponse>('/subscriptions/check-access');
+  return response.data;
+};
+
+// Debug Flow Types and API
+export interface DebugFlowParams {
+  firstname: string;
+  lastname: string;
+  address: string;
+  fullname?: string;
+  provider?: 'searchbug' | 'whitepages';
+}
+
+export interface BloomKeyResult {
+  key: string;
+  type: 'phone' | 'address';
+  found_in_db: boolean;
+  candidates_count: number;
+}
+
+export interface SearchKeyResult {
+  key: string;
+  key_type: string;
+  matched: boolean;
+}
+
+export interface CandidateResult {
+  ssn: string;
+  firstname?: string;
+  lastname?: string;
+  middlename?: string;
+  dob?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  phone?: string;
+  email?: string;
+  source_table?: string;
+  matched_keys: string[];
+  candidate_keys: string[];
+  matched_keys_count: number;
+  best_match_priority?: number;
+}
+
+export interface DebugFlowResponse {
+  provider: string;
+  searchbug_data: Record<string, any>;
+  bloom_keys_phone: BloomKeyResult[];
+  bloom_keys_address: BloomKeyResult[];
+  level1_candidates_count: number;
+  query_keys: SearchKeyResult[];
+  searchbug_mn?: string;
+  searchbug_dob_year?: string;
+  candidates_with_keys: CandidateResult[];
+  final_results: CandidateResult[];
+  final_count: number;
+}
+
+export const debugFlowSearch = async (params: DebugFlowParams): Promise<DebugFlowResponse> => {
+  const response = await apiClient.post<DebugFlowResponse>('/search/debug-flow', params);
+  return response.data;
+};
+
+// Search DB (Admin SSN lookup)
+export interface SearchDBParams {
+  ssn: string;
+}
+
+export interface SearchDBRecord {
+  id?: number;
+  ssn: string;
+  firstname?: string;
+  lastname?: string;
+  middlename?: string;
+  dob?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  phone?: string;
+  email?: string;
+  source_table?: string;
+}
+
+export interface SearchDBResponse {
+  query: string;
+  results: SearchDBRecord[];
+  count: number;
+}
+
+export const searchDB = async (params: SearchDBParams): Promise<SearchDBResponse> => {
+  const response = await apiClient.post<SearchDBResponse>('/search/search-db', params);
+  return response.data;
+};
+
+// Test Search
+export interface TestSearchResponse {
+  input_fullname: string;
+  input_address: string;
+  searchbug_dob?: string;
+  ssn_results: string[];
+  count: number;
+}
+
+export const testSearch = async (params: DebugFlowParams): Promise<TestSearchResponse> => {
+  const response = await apiClient.post<TestSearchResponse>('/search/test-search', params);
+  return response.data;
+};
+
+// Test Search History
+export interface TestSearchHistoryItem {
+  id: string;
+  input_fullname: string;
+  input_address: string;
+  result_fullname: string;
+  result_address: string;
+  ssn: string;
+  dob?: string;
+  found: boolean;
+  status: 'processing' | 'done' | 'nf';
+  search_time?: number;
+  created_at: string;
+}
+
+export interface TestSearchHistoryResponse {
+  history: TestSearchHistoryItem[];
+  total_requests: number;
+  successful_requests: number;
+  total_found: number;
+}
+
+export const getTestSearchHistory = async (source?: string): Promise<TestSearchHistoryResponse> => {
+  const params = source ? { source } : {};
+  const response = await apiClient.get<TestSearchHistoryResponse>('/search/test-search/history', { params });
+  return response.data;
+};
+
+// Unified Search
+export interface UnifiedSearchParams {
+  fullname: string;
+  address: string;
+}
+
+export interface UnifiedSearchResponse {
+  success: boolean;
+  found: boolean;
+  results: InstantSSNResult[];
+  order_id?: string;
+  charged_amount?: number;
+  ticket_id?: string;
+  ticket_status?: string;
+  new_balance?: number;
+  message?: string;
+  searchbug_dob?: string;
+}
+
+export const unifiedSearch = async (params: UnifiedSearchParams): Promise<UnifiedSearchResponse> => {
+  const response = await apiClient.post<UnifiedSearchResponse>('/search/unified-search', params);
   return response.data;
 };
 

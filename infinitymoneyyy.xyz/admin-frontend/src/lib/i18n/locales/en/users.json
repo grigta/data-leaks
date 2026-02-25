@@ -1,0 +1,60 @@
+{
+	"title": "Users",
+	"periods": {
+		"24h": "24h",
+		"7d": "7d",
+		"30d": "30d",
+		"all": "All"
+	},
+	"searchModes": {
+		"auto": "Auto",
+		"instant": "Instant",
+		"manual": "Manual"
+	},
+	"table": {
+		"user": "User",
+		"price": "Price",
+		"type": "Type",
+		"totalProfit": "Total Profit",
+		"instProfit": "Inst Profit",
+		"roiInst": "ROI Inst",
+		"successInst": "% Succ Inst",
+		"manualProfit": "Manual Profit",
+		"roiManual": "ROI Manual",
+		"successManual": "% Succ Man",
+		"deposit": "Deposit",
+		"balance": "Balance",
+		"regDate": "Reg Date",
+		"addBal": "+Bal",
+		"ban": "Ban"
+	},
+	"noUsers": "No users found",
+	"instantLabel": "Instant (instant)",
+	"manualLabel": "Manual (manual)",
+	"addBalance": {
+		"title": "Add Balance",
+		"description": "Adding balance for user <strong>{{username}}</strong>. Current balance: {{balance}}",
+		"amount": "Amount ($)",
+		"placeholder": "50.00",
+		"invalidAmount": "Enter a valid amount",
+		"adding": "Adding...",
+		"add": "Add"
+	},
+	"changePrice": {
+		"title": "Change Price",
+		"description": "Instant SSN price for <strong>{{username}}</strong>",
+		"price": "Price ($)",
+		"placeholder": "2.00",
+		"invalidPrice": "Enter a valid price",
+		"updated": "Price for {{username}} updated: ${{price}}"
+	},
+	"banUser": {
+		"title": "Ban User",
+		"description": "You are about to ban <strong>{{username}}</strong>.",
+		"reason": "Ban Reason",
+		"reasonPlaceholder": "Ban reason...",
+		"reasonRequired": "Provide a ban reason (min 3 characters)",
+		"banning": "Banning...",
+		"banButton": "Ban"
+	}
+}

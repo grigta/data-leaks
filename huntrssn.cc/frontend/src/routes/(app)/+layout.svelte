@@ -3,10 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser, dev } from '$app/environment';
-	import { user, logout } from '$lib/stores/auth';
+	import { get } from 'svelte/store';
+	import { user, logout, initComplete } from '$lib/stores/auth';
 	import { loadUnviewedOrdersCount } from '$lib/stores/orders';
 	import { loadUnviewedTicketsCount, unviewedTicketsCount, incrementUnviewedTicketsCount } from '$lib/stores/tickets';
-	import { checkSubscriptionAccess, type CheckAccessResponse } from '$lib/api/client';
 	import { formatCurrency } from '$lib/utils';
 	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar';
 	import { Badge } from '$lib/components/ui/badge';
@@ -19,20 +19,28 @@
 		DropdownMenuSeparator
 	} from '$lib/components/ui/dropdown-menu';
 	import CompactSidebar from '$lib/components/CompactSidebar.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Check from '@lucide/svelte/icons/check';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import Globe from '@lucide/svelte/icons/globe';
 	import FileText from '@lucide/svelte/icons/file-text';
-	import CreditCard from '@lucide/svelte/icons/credit-card';
+
+	import Ticket from '@lucide/svelte/icons/ticket';
+	import Eye from '@lucide/svelte/icons/eye';
+	import EyeOff from '@lucide/svelte/icons/eye-off';
+	import LogOut from '@lucide/svelte/icons/log-out';
+	import Sun from '@lucide/svelte/icons/sun';
+	import Moon from '@lucide/svelte/icons/moon';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import { ANIMATION_DURATIONS } from '$lib/constants/animations';
 	import { currentLanguage } from '$lib/stores/language';
+	import { currentTheme } from '$lib/stores/theme';
 	import { t } from '$lib/i18n';
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { toast } from 'svelte-sonner';
 	import { isAuthenticated } from '$lib/stores/auth';
-	import { wsManager, TICKET_COMPLETED, TICKET_UPDATED } from '$lib/websocket/client';
+	import { wsManager, TICKET_COMPLETED, TICKET_UPDATED, BALANCE_UPDATED } from '$lib/websocket/client';
 	import ApplyCouponModal from '$lib/components/ApplyCouponModal.svelte';
 	import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '$lib/components/ui/dialog';
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
@@ -49,7 +57,19 @@
 	let isLoggingOut = $state(false);
 	let codeVisible = $state(false);
 	let showCouponModal = $state(false);
-	let subscriptionStatus = $state<CheckAccessResponse | null>(null);
+	let dropdownOpen = $state(false);
+
+	const isDark = $derived($currentTheme === 'dark');
+
+	function navigateAndClose(path: string) {
+		dropdownOpen = false;
+		goto(path);
+	}
+
+	function toggleTheme() {
+		currentTheme.set(isDark ? 'light' : 'dark');
+	}
+
 
 	function toggleCodeVisibility() {
 		codeVisible = !codeVisible;
@@ -93,52 +113,70 @@
 		showCouponModal = false;
 	}
 
-	async function loadSubscriptionStatus() {
+	// Load unviewed orders and tickets count on mount after auth is initialized
+	let wsInitialized = false;
+
+	function connectWebSocket() {
+		if (wsInitialized || !browser) return;
+		const currentUser = get(user);
+		if (!currentUser) return;
+
+		const token = localStorage.getItem('access_token');
+		if (!token) return;
+
+		wsInitialized = true;
 		try {
-			subscriptionStatus = await checkSubscriptionAccess();
+			// Main site always uses public WebSocket (admin WS is only for admin panel)
+			const endpoint = '/api/public/ws';
+
+			wsManager.connect(token, endpoint);
+
+			// Глобальная подписка на события завершения тикетов
+			wsManager.on(TICKET_COMPLETED, (data: any) => {
+				if ($user && data.user_id === $user.id) {
+					incrementUnviewedTicketsCount();
+					toast.info('Ваш запрос на ручной пробив выполнен!');
+				}
+			});
+
+			// Подписка на обновления тикетов (если статус стал completed)
+			wsManager.on(TICKET_UPDATED, (data: any) => {
+				if ($user && data.user_id === $user.id && data.status === 'completed') {
+					incrementUnviewedTicketsCount();
+					toast.info('Ваш запрос на ручной пробив выполнен!');
+				}
+			});
+
+			// Подписка на обновления баланса в реальном времени
+			wsManager.on(BALANCE_UPDATED, (data: any) => {
+				if ($user && data.new_balance != null) {
+					$user.balance = data.new_balance;
+				}
+			});
 		} catch (error) {
-			console.error('Failed to load subscription status:', error);
+			console.error('[App Layout] Failed to initialize WebSocket:', error);
 		}
 	}
 
-	// Load unviewed orders and tickets count on mount after auth is initialized
 	onMount(() => {
 		loadUnviewedOrdersCount();
 		loadUnviewedTicketsCount();
-		loadSubscriptionStatus();
 
-		// Initialize WebSocket connection based on user role
+		// Connect WebSocket when auth is ready
 		if (browser) {
-			const token = localStorage.getItem('access_token');
-			if (token && $user) {
-				try {
-					// Admins and workers connect to admin WebSocket
-					// Regular users connect to public WebSocket
-					const endpoint = ($user.is_admin || $user.worker_role)
-						? '/api/admin/ws'
-						: '/api/public/ws';
+			// Try immediately (user might already be loaded)
+			connectWebSocket();
 
-					wsManager.connect(token, endpoint);
-					dev && console.log(`[App Layout] WebSocket connection initialized to ${endpoint}`);
-
-					// Глобальная подписка на события завершения тикетов
-					wsManager.on(TICKET_COMPLETED, (data: any) => {
-						if ($user && data.user_id === $user.id) {
-							incrementUnviewedTicketsCount();
-							toast.info('Ваш запрос на ручной пробив выполнен!');
-						}
-					});
-
-					// Подписка на обновления тикетов (если статус стал completed)
-					wsManager.on(TICKET_UPDATED, (data: any) => {
-						if ($user && data.user_id === $user.id && data.status === 'completed') {
-							incrementUnviewedTicketsCount();
-							toast.info('Ваш запрос на ручной пробив выполнен!');
-						}
-					});
-				} catch (error) {
-					console.error('[App Layout] Failed to initialize WebSocket:', error);
-				}
+			// If not ready yet, poll until initComplete
+			if (!wsInitialized) {
+				const interval = setInterval(() => {
+					if (get(initComplete)) {
+						connectWebSocket();
+						clearInterval(interval);
+					}
+				}, 200);
+				// Safety cleanup after 15s
+				setTimeout(() => clearInterval(interval), 15000);
 			}
 		}
 	});
@@ -171,117 +209,161 @@
 	<!-- Main content -->
 	<div class="flex flex-1 flex-col">
 		<!-- Header -->
-		<header class="sticky top-0 z-10 bg-background px-6 py-3">
+		<header class="sticky top-0 z-10 bg-background px-6 py-3 border-b border-border">
 			<div class="flex items-center justify-between">
-				<!-- Left side - Empty for now -->
+				<!-- Left side -->
 				<div></div>
 
-				<!-- Right side - Theme Toggle, Unviewed Tickets Badge, Balance Badge and Avatar with Dropdown -->
+				<!-- Right side -->
 				<div class="flex items-center gap-4">
+					<!-- Language Toggle -->
+					<button
+						onclick={toggleLanguage}
+						class="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent transition-colors duration-normal"
+						aria-label={$currentLanguage === 'en' ? 'Switch to Russian' : 'Switch to English'}
+						title={$currentLanguage === 'en' ? 'Русский' : 'English'}
+					>
+						<Globe class="h-4 w-4 text-muted-foreground" />
+					</button>
+
 					<!-- Theme Toggle -->
-					<ThemeToggle />
-
-					<!-- Unviewed Tickets Badge -->
-					{#if $unviewedTicketsCount > 0}
-						<a href="/manual-ssn" class="transition-opacity duration-normal hover:opacity-80">
-							<Badge variant="secondary" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105">
-								<FileText class="h-3 w-3" />
-								{$unviewedTicketsCount} new
-							</Badge>
-						</a>
-					{/if}
-
-					<!-- Subscription Status Badge -->
-					{#if subscriptionStatus?.has_access}
-						<a href="/subscription" class="transition-opacity duration-normal hover:opacity-80">
-							<Badge variant="outline" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105 bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
-								<CreditCard class="h-3 w-3" />
-								Active
-							</Badge>
-						</a>
-					{:else if subscriptionStatus !== null}
-						<a href="/subscription" class="transition-opacity duration-normal hover:opacity-80">
-							<Badge variant="outline" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105 bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800">
-								<CreditCard class="h-3 w-3" />
-								No Sub
-							</Badge>
-						</a>
-					{/if}
+					<button
+						onclick={toggleTheme}
+						class="h-8 w-8 rounded-md flex items-center justify-center hover:bg-accent transition-colors duration-normal"
+						aria-label="Toggle theme"
+					>
+						{#if isDark}
+							<Moon class="h-4 w-4 text-muted-foreground" />
+						{:else}
+							<Sun class="h-4 w-4 text-muted-foreground" />
+						{/if}
+					</button>
 
 					<!-- Balance Badge -->
 					<a href="/balance" class="transition-opacity duration-normal hover:opacity-80">
-						<Badge variant="outline" class="flex items-center gap-1 cursor-pointer transition-transform duration-normal hover:scale-105">
+						<Badge variant="outline" class="flex items-center gap-1 cursor-pointer">
 							<Wallet class="h-3 w-3" />
 							{formatCurrency($user?.balance || 0)}
 						</Badge>
 					</a>
 
-					<!-- User Avatar with Dropdown -->
-					<DropdownMenu>
-						<DropdownMenuTrigger class="rounded-full transition-opacity hover:opacity-80 cursor-pointer">
+					<!-- User Avatar with Mega Dropdown -->
+					<DropdownMenu bind:open={dropdownOpen}>
+						<DropdownMenuTrigger class="transition-opacity hover:opacity-80 cursor-pointer">
 							<Avatar>
-								<AvatarFallback>{getUserInitials($user?.username)}</AvatarFallback>
+								<AvatarFallback>
+									<UserIcon class="h-4 w-4" />
+								</AvatarFallback>
 							</Avatar>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" class="min-w-[250px]">
-							<div class="flex items-center justify-between gap-2 px-2 py-2">
-								<span
-									class="font-mono text-lg font-bold text-foreground cursor-pointer select-none transition-all duration-300"
-									class:blur-sm={!codeVisible}
-									onclick={toggleCodeVisibility}
-									role="button"
-									tabindex="0"
-								>
-									{$user?.access_code || 'N/A'}
-								</span>
-								<button
-									onclick={copyAccessCode}
-									class="flex-shrink-0 rounded-md p-1.5 hover:bg-accent transition-colors duration-normal"
-									type="button"
-									disabled={isLoggingOut}
-								>
-									{#if copied}
-										<Check class="h-4 w-4 animate-in fade-in zoom-in duration-normal" />
-									{:else}
-										<Copy class="h-4 w-4" />
-									{/if}
-								</button>
+						<DropdownMenuContent align="end" class="w-[380px] p-0 overflow-hidden">
+							<!-- Section 1: User Info -->
+							<div class="bg-gradient-to-r from-accent/60 to-transparent p-4">
+								<div class="flex items-center gap-3">
+									<Avatar class="h-11 w-11">
+										<AvatarFallback class="bg-primary text-primary-foreground font-bold text-sm">
+											<UserIcon class="h-5 w-5" />
+										</AvatarFallback>
+									</Avatar>
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2">
+											<span class="text-sm font-semibold truncate">{$user?.username || 'N/A'}</span>
+											<Badge variant="secondary" class="text-[10px] px-1.5 py-0">User</Badge>
+										</div>
+										<p class="text-xl font-bold tabular-nums mt-0.5">
+											{formatCurrency($user?.balance || 0)}
+										</p>
+									</div>
+								</div>
 							</div>
 
-							<DropdownMenuSeparator />
+							<DropdownMenuSeparator class="m-0" />
 
-							<DropdownMenuItem onclick={() => goto('/crypto-deposit')} disabled={isLoggingOut}>
-								{$t('navigation.addBalance')}
-							</DropdownMenuItem>
-
-							<DropdownMenuItem onclick={openCouponModal} disabled={isLoggingOut}>
-								Применить купон
-							</DropdownMenuItem>
-
-							<DropdownMenuSeparator />
-
-							<DropdownMenuItem onclick={toggleLanguage} disabled={isLoggingOut}>
-								<Globe class="mr-2 h-4 w-4" />
-								{$currentLanguage === 'en' ? 'Русский' : 'English'}
-							</DropdownMenuItem>
-
-							<DropdownMenuSeparator />
-
-							<DropdownMenuItem onclick={handleLogout} disabled={isLoggingOut}>
-								{#if isLoggingOut}
-									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-									{$t('navigation.loggingOut')}
-								{:else}
-									{$t('navigation.logout')}
-								{/if}
-							</DropdownMenuItem>
-
-							<DropdownMenuSeparator />
-
-							<div class="px-2 py-2">
-								<div class="text-xs text-muted-foreground text-center">
-									{$user?.username || 'N/A'}
+							<!-- Section 2: Quick Actions -->
+							<div class="px-4 py-3">
+								<p class="text-xs text-muted-foreground font-medium pb-2">{$t('navigation.quickActions')}</p>
+								<div class="flex gap-2">
+									<Button
+										size="sm"
+										class="flex-1"
+										onclick={() => navigateAndClose('/balance')}
+										disabled={isLoggingOut}
+									>
+										<Wallet class="mr-1.5 h-3.5 w-3.5" />
+										{$t('navigation.deposit')}
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										class="flex-1"
+										onclick={openCouponModal}
+										disabled={isLoggingOut}
+									>
+										<Ticket class="mr-1.5 h-3.5 w-3.5" />
+										{$t('navigation.coupon')}
+									</Button>
 								</div>
+							</div>
+
+							<DropdownMenuSeparator class="m-0" />
+
+							<!-- Section 3: Access Code -->
+							<div class="px-4 py-3">
+								<p class="text-xs text-muted-foreground font-medium pb-2">{$t('navigation.accessCode')}</p>
+								<div class="flex items-center gap-2">
+									<div class="flex-1 flex items-center bg-muted/50 border border-border rounded-md px-3 py-1.5">
+										<span
+											class="font-mono text-sm font-semibold text-foreground select-none transition-all duration-300 flex-1"
+											class:blur-sm={!codeVisible}
+										>
+											{$user?.access_code || 'N/A'}
+										</span>
+									</div>
+									<button
+										onclick={toggleCodeVisibility}
+										class="flex-shrink-0 rounded-md p-2 hover:bg-accent transition-colors duration-normal"
+										type="button"
+										aria-label={codeVisible ? 'Hide code' : 'Show code'}
+									>
+										{#if codeVisible}
+											<EyeOff class="h-4 w-4 text-muted-foreground" />
+										{:else}
+											<Eye class="h-4 w-4 text-muted-foreground" />
+										{/if}
+									</button>
+									<button
+										onclick={copyAccessCode}
+										class="flex-shrink-0 rounded-md p-2 hover:bg-accent transition-colors duration-normal"
+										type="button"
+										disabled={isLoggingOut}
+										aria-label="Copy access code"
+									>
+										{#if copied}
+											<Check class="h-4 w-4 text-[hsl(var(--success))] animate-in fade-in zoom-in duration-normal" />
+										{:else}
+											<Copy class="h-4 w-4 text-muted-foreground" />
+										{/if}
+									</button>
+								</div>
+							</div>
+
+							<DropdownMenuSeparator class="m-0" />
+
+							<!-- Section 4: Footer Actions -->
+							<div class="bg-muted/30 px-4 py-2.5 flex items-center justify-end">
+								<button
+									onclick={handleLogout}
+									class="h-9 w-9 rounded-md flex items-center justify-center hover:bg-destructive/10 transition-colors duration-normal"
+									disabled={isLoggingOut}
+									aria-label={$t('navigation.logout')}
+									title={$t('navigation.logout')}
+								>
+									{#if isLoggingOut}
+										<Loader2 class="h-4 w-4 text-destructive animate-spin" />
+									{:else}
+										<LogOut class="h-4 w-4 text-destructive" />
+									{/if}
+								</button>
 							</div>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -313,7 +395,7 @@
 
 		<div class="space-y-4 py-4">
 			{#if $user?.ban_reason}
-				<div class="rounded-lg bg-muted p-4">
+				<div class="border border-border bg-muted/50 rounded-lg p-4">
 					<h4 class="text-sm font-medium mb-2">Причина блокировки:</h4>
 					<p class="text-sm text-muted-foreground">{$user.ban_reason}</p>
 				</div>

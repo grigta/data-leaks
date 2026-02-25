@@ -57,15 +57,17 @@ const config = {
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))'
-        }
+        },
+        elegant: '#18181b'
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)'
+        lg: '0.5rem',
+        md: '0.375rem',
+        sm: '0.25rem',
+        full: '9999px'
       },
       fontFamily: {
-        sans: ['Montserrat Alternates', ...fontFamily.sans]
+        sans: ['Inter', ...fontFamily.sans]
       }
     }
   },

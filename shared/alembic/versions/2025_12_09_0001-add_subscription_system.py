@@ -1,7 +1,7 @@
 """Add subscription system tables
 
 Revision ID: add_subscription_001
-Revises: add_phone_lookup_001
+Revises: 9f689bdfe298
 Create Date: 2025-12-09 00:01:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_subscription_001'
-down_revision = 'add_phone_lookup_001'
+down_revision = '9f689bdfe298'
 branch_labels = None
 depends_on = None
 

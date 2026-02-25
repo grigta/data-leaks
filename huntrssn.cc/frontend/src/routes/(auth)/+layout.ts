@@ -15,8 +15,8 @@ export const load: LayoutLoad = async ({ parent }) => {
 		const token = localStorage.getItem('access_token');
 		if (token) {
 			// User is authenticated, redirect to dashboard
-			console.debug('[Auth Guard] User has token, redirecting from auth page to dashboard');
-			goto('/dashboard');
+			console.debug('[Auth Guard] User has token, redirecting from auth page to search');
+			goto('/search');
 			return parentData;
 		}
 	}

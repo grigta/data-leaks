@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { login, isAuthenticated, isLoggingIn } from '$lib/stores/auth';
+	import { login, isLoggingIn } from '$lib/stores/auth';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -46,22 +46,9 @@
 				if (!response.success) {
 					errorMessage = response.error || $t('auth.login.invalidCode');
 				} else {
-					// Wait for auth store to actually update before navigating
-					// This prevents race conditions with layout loaders
-					await new Promise<void>((resolve) => {
-						const unsubscribe = isAuthenticated.subscribe(val => {
-							if (val) {
-								unsubscribe();
-								resolve();
-							}
-						});
-						// Fallback timeout in case something goes wrong
-						setTimeout(() => {
-							unsubscribe();
-							resolve();
-						}, 2000);
-					});
-					goto('/dashboard');
+					// login() already sets isAuthenticated=true and saves token
+					// before returning success, so we can navigate immediately
+					goto('/search');
 				}
 			}
 		}
@@ -90,7 +77,7 @@
 
 <Card class="w-full max-w-md">
 	<CardHeader>
-		<CardTitle>{$t('auth.login.title')}</CardTitle>
+		<CardTitle class="font-semibold">{$t('auth.login.title')}</CardTitle>
 		<CardDescription>{$t('auth.login.subtitle')}</CardDescription>
 	</CardHeader>
 	<form method="POST" use:enhance>
@@ -115,7 +102,7 @@
 						bind:value={$form.access_code}
 						oninput={handleInput}
 						maxlength="15"
-						class="font-mono text-lg transition-all duration-normal hover:border-primary/50 focus:scale-[1.01]"
+						class="font-mono text-lg"
 						aria-invalid={$errors.access_code || errorMessage ? 'true' : undefined}
 						autocomplete="off"
 					/>
@@ -143,7 +130,7 @@
 		<CardFooter class="flex flex-col space-y-4">
 			<Button
 				type="submit"
-				class="w-full transition-all duration-normal hover:scale-[1.02]"
+				class="w-full font-heading"
 				disabled={$isLoggingIn || $delayed}
 			>
 				{#if $isLoggingIn}
@@ -157,7 +144,7 @@
 				{$t('auth.login.noAccount')}
 				<a
 					href="/register"
-					class="text-primary hover:underline transition-colors duration-normal"
+					class="text-primary hover:underline"
 				>
 					{$t('auth.login.signUp')}
 				</a>

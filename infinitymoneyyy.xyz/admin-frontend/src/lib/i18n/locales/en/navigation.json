@@ -1,0 +1,18 @@
+{
+	"adminPanel": "Admin Panel",
+	"profitDashboard": "Profit Dashboard",
+	"profitUsers": "Users (Profit)",
+	"report": "Report",
+	"workers": "Workers",
+	"apiErrors": "API Errors",
+	"allOrders": "All Orders",
+	"settings": "Settings",
+	"testPolygon": "Test Polygon",
+	"myAccount": "My Account",
+	"theme": "Theme",
+	"themeLight": "Light",
+	"themeDark": "Dark",
+	"themeSystem": "System",
+	"loggingOut": "Logging out...",
+	"logout": "Logout"
+}

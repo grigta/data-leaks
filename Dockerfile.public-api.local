@@ -1,0 +1,43 @@
+# Dockerfile for Public API - local build
+FROM python:3.11-slim as builder
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY shared/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+
+# Copy huntrssn.cc/api and remove symlinks
+COPY --chown=appuser:appuser huntrssn.cc/api /app/api
+RUN rm -rf /app/api/common && rm -rf /app/api/public/common 2>/dev/null || true
+
+# Copy actual directories
+COPY --chown=appuser:appuser infinitymoneyyy.xyz/api/admin /app/api/admin
+COPY --chown=appuser:appuser shared/api/common /app/api/common
+COPY --chown=appuser:appuser shared/database /app/database
+COPY --chown=appuser:appuser shared/alembic /app/alembic
+COPY --chown=appuser:appuser alembic.ini /app/alembic.ini
+
+USER appuser
+EXPOSE 8000
+
+CMD ["sh", "-c", "uvicorn api.public.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4} --timeout-keep-alive 5 --log-level info"]

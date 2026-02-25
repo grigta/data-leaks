@@ -1,12 +1,10 @@
 import type { ComponentType } from 'svelte';
-import Home from '@lucide/svelte/icons/home';
-import FileText from '@lucide/svelte/icons/file-text';
 import Package from '@lucide/svelte/icons/package';
-import Code from '@lucide/svelte/icons/code';
 import HelpCircle from '@lucide/svelte/icons/help-circle';
-import MessageCircle from '@lucide/svelte/icons/message-circle';
-import CreditCard from '@lucide/svelte/icons/credit-card';
-import MessageSquare from '@lucide/svelte/icons/message-square';
+import Bug from '@lucide/svelte/icons/bug';
+import Database from '@lucide/svelte/icons/database';
+import Search from '@lucide/svelte/icons/search';
+import FlaskConical from '@lucide/svelte/icons/flask-conical';
 
 export interface NavItem {
 	href: string;
@@ -20,46 +18,22 @@ type TranslateFunction = (key: string) => string;
 export function getNavItems(t: TranslateFunction): NavItem[] {
 	return [
 		{
-			href: '/dashboard',
-			label: t('navigation.dashboard'),
-			icon: Home,
-			ariaLabel: `Navigate to ${t('navigation.dashboard')}`
+			href: '/search',
+			label: t('navigation.search'),
+			icon: Search,
+			ariaLabel: `Navigate to ${t('navigation.search')}`
 		},
 		{
-			href: '/sms',
-			label: t('navigation.sms'),
-			icon: MessageSquare,
-			ariaLabel: `Navigate to ${t('navigation.sms')}`
-		},
-		{
-			href: '/manual-ssn',
-			label: t('navigation.manualSSN'),
-			icon: FileText,
-			ariaLabel: `Navigate to ${t('navigation.manualSSN')}`
+			href: '/test-search',
+			label: t('navigation.testSearch'),
+			icon: FlaskConical,
+			ariaLabel: `Navigate to ${t('navigation.testSearch')}`
 		},
 		{
 			href: '/orders',
 			label: t('navigation.orders'),
 			icon: Package,
 			ariaLabel: `Navigate to ${t('navigation.orders')}`
-		},
-		{
-			href: '/subscription',
-			label: t('navigation.subscription'),
-			icon: CreditCard,
-			ariaLabel: `Navigate to ${t('navigation.subscription')}`
-		},
-		{
-			href: '/api',
-			label: t('navigation.api'),
-			icon: Code,
-			ariaLabel: `Navigate to ${t('navigation.api')}`
-		},
-		{
-			href: '/telegram',
-			label: t('navigation.telegram'),
-			icon: MessageCircle,
-			ariaLabel: `Navigate to ${t('navigation.telegram')}`
 		},
 		{
 			href: '/support',
@@ -70,49 +44,36 @@ export function getNavItems(t: TranslateFunction): NavItem[] {
 	];
 }
 
+export function getAdminNavItems(): NavItem[] {
+	return [
+		{
+			href: '/debug-flow',
+			label: 'Debug Flow',
+			icon: Bug,
+			ariaLabel: 'Navigate to Debug Flow'
+		},
+		{
+			href: '/search-db',
+			label: 'Search DB',
+			icon: Database,
+			ariaLabel: 'Navigate to Search DB'
+		}
+	];
+}
+
 // Deprecated: use getNavItems() instead
 export const NAV_ITEMS: NavItem[] = [
 	{
-		href: '/dashboard',
-		label: 'Dashboard',
-		icon: Home,
-		ariaLabel: 'Navigate to Dashboard'
-	},
-	{
-		href: '/sms',
-		label: 'SMS Service',
-		icon: MessageSquare,
-		ariaLabel: 'Navigate to SMS Service'
-	},
-	{
-		href: '/manual-ssn',
-		label: 'Manual SSN',
-		icon: FileText,
-		ariaLabel: 'Navigate to Manual SSN'
+		href: '/search',
+		label: 'Search',
+		icon: Search,
+		ariaLabel: 'Navigate to Search'
 	},
 	{
 		href: '/orders',
 		label: 'Orders',
 		icon: Package,
 		ariaLabel: 'Navigate to Orders'
-	},
-	{
-		href: '/subscription',
-		label: 'Subscription',
-		icon: CreditCard,
-		ariaLabel: 'Navigate to Subscription'
-	},
-	{
-		href: '/api',
-		label: 'API',
-		icon: Code,
-		ariaLabel: 'Navigate to API'
-	},
-	{
-		href: '/telegram',
-		label: 'Telegram Bot',
-		icon: MessageCircle,
-		ariaLabel: 'Navigate to Telegram Bot'
 	},
 	{
 		href: '/support',

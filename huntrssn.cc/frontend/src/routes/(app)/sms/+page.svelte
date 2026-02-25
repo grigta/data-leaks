@@ -312,7 +312,7 @@
 	{:else}
 		<Card>
 			<CardHeader class="text-center">
-				<CardTitle class="text-2xl flex items-center justify-center gap-2">
+				<CardTitle class="text-2xl font-semibold flex items-center justify-center gap-2">
 					<MessageSquare class="h-6 w-6" />
 					{$t('sms.title')}
 				</CardTitle>
@@ -328,7 +328,7 @@
 				{#if activeRental}
 					<!-- Active Rental Block -->
 					<div class="space-y-6">
-						<div class="bg-muted/50 rounded-lg p-6 space-y-4">
+						<div class="border border-border bg-muted/50 rounded-lg p-6 space-y-4">
 							<div class="flex items-center justify-between">
 								<h3 class="text-lg font-semibold">{$t('sms.activeRental')}</h3>
 								<Badge variant={getStatusBadgeVariant(activeRental.status)}>
@@ -342,7 +342,7 @@
 								<div class="flex items-center gap-2">
 									<button
 										type="button"
-										class="flex-1 bg-background rounded-md p-3 font-mono text-lg text-left hover:bg-accent/50 transition-colors cursor-pointer"
+										class="flex-1 border border-border bg-background rounded-lg p-3 font-mono text-lg text-left hover:bg-accent transition-colors duration-200 cursor-pointer"
 										onclick={() => copyToClipboard(activeRental!.phone_number, 'phone')}
 									>
 										{activeRental.phone_number}
@@ -353,7 +353,7 @@
 										onclick={() => copyToClipboard(activeRental!.phone_number, 'phone')}
 									>
 										{#if copiedPhone}
-											<Check class="h-5 w-5 text-green-500" />
+											<Check class="h-5 w-5 text-primary" />
 										{:else}
 											<Copy class="h-5 w-5" />
 										{/if}
@@ -380,7 +380,7 @@
 									<div class="flex items-center gap-2">
 										<button
 											type="button"
-											class="flex-1 bg-green-100 dark:bg-green-900/30 rounded-md p-3 font-mono text-2xl text-center font-bold text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
+											class="flex-1 border border-primary bg-primary/10 rounded-lg p-3 font-mono text-2xl text-center font-bold text-primary hover:bg-primary hover:text-primary-foreground transition-colors duration-200 cursor-pointer"
 											onclick={() => copyToClipboard(activeRental!.sms_code!, 'code')}
 										>
 											{activeRental.sms_code}
@@ -391,7 +391,7 @@
 											onclick={() => copyToClipboard(activeRental!.sms_code!, 'code')}
 										>
 											{#if copiedCode}
-												<Check class="h-5 w-5 text-green-500" />
+												<Check class="h-5 w-5 text-primary" />
 											{:else}
 												<Copy class="h-5 w-5" />
 											{/if}
@@ -402,7 +402,7 @@
 								<div class="space-y-2">
 									<Label class="text-sm text-muted-foreground">{$t('sms.smsCode')}</Label>
 									<div class="flex items-center gap-2">
-										<div class="flex-1 bg-background rounded-md p-3 text-center text-muted-foreground">
+										<div class="flex-1 border border-border bg-muted/30 rounded-lg p-3 text-center text-muted-foreground">
 											<div class="flex items-center justify-center gap-2">
 												<Loader2 class="h-4 w-4 animate-spin" />
 												{$t('sms.waitingForSms')}
@@ -467,11 +467,11 @@
 							</div>
 
 							{#if isDropdownOpen || selectedService}
-								<div class="border border-border rounded-md max-h-64 overflow-y-auto bg-popover">
+								<div class="border border-border rounded-lg max-h-64 overflow-y-auto bg-popover">
 									{#each filteredServices as service}
 										<button
 											type="button"
-											class="w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b last:border-b-0 bg-background hover:bg-accent hover:text-accent-foreground {selectedService === service.code ? 'bg-accent text-accent-foreground' : 'text-foreground'}"
+											class="w-full px-4 py-3 text-left transition-colors duration-200 flex items-center justify-between border-b last:border-b-0 bg-background hover:bg-accent hover:text-accent-foreground {selectedService === service.code ? 'bg-accent text-accent-foreground' : 'text-foreground'}"
 											onpointerdown={() => {
 												selectedService = service.code;
 												selectedServiceData = service;
@@ -480,7 +480,7 @@
 											}}
 										>
 											<span class="font-medium">{service.name}</span>
-											<span class="text-sm font-semibold text-green-600 dark:text-green-400">{formatPrice(service.user_price)}</span>
+											<span class="text-sm font-semibold text-primary">{formatPrice(service.user_price)}</span>
 										</button>
 									{:else}
 										<div class="px-4 py-3 text-center text-muted-foreground bg-background">{$t('sms.noServicesFound')}</div>
@@ -491,12 +491,12 @@
 
 						<!-- Selected Service Info -->
 						{#if selectedServiceData}
-							<div class="bg-muted/50 rounded-lg p-4 space-y-2">
+							<div class="border border-border bg-muted/50 rounded-lg p-4 space-y-2">
 								<p class="text-sm">
 									<strong>{$t('sms.selectedService')}:</strong> {selectedServiceData.name}
 								</p>
 								<p class="text-sm">
-									<strong>{$t('sms.price')}:</strong> <span class="text-green-600 dark:text-green-400 font-semibold">{formatPrice(selectedServiceData.user_price)}</span>
+									<strong>{$t('sms.price')}:</strong> <span class="text-primary font-semibold">{formatPrice(selectedServiceData.user_price)}</span>
 								</p>
 								<p class="text-xs text-muted-foreground">
 									{$t('sms.priceHint')}
@@ -540,7 +540,7 @@
 				<!-- History Section -->
 				{#if showHistory}
 					<div class="mt-8 space-y-4">
-						<h3 class="text-lg font-semibold">{$t('sms.rentalHistory')}</h3>
+						<h3 class="text-lg font-semibold font-semibold">{$t('sms.rentalHistory')}</h3>
 
 						{#if isLoadingRentals}
 							<div class="flex justify-center py-8">
@@ -553,12 +553,12 @@
 						{:else}
 							<div class="space-y-2">
 								{#each rentals as rental}
-									<div class="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+									<div class="flex items-center justify-between p-4 border border-border bg-muted/30 rounded-lg">
 										<div class="space-y-1">
 											<div class="font-medium">{rental.service_name}</div>
 											<div class="text-sm text-muted-foreground font-mono">{rental.phone_number}</div>
 											{#if rental.sms_code}
-												<div class="text-sm font-mono text-green-600 dark:text-green-400">
+												<div class="text-sm font-mono text-primary">
 													{$t('sms.code')}: {rental.sms_code}
 												</div>
 											{/if}

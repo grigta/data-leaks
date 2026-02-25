@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <!-- Увеличиваем серверный лимит памяти до 95% RAM -->
+    <max_server_memory_usage_to_ram_ratio>0.95</max_server_memory_usage_to_ram_ratio>
+    <!-- 32 ядра — увеличиваем пул фоновых потоков -->
+    <background_pool_size>32</background_pool_size>
+    <background_merges_mutations_concurrency_ratio>2</background_merges_mutations_concurrency_ratio>
+</clickhouse>

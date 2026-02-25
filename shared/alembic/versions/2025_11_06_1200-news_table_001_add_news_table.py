@@ -1,7 +1,7 @@
 """Add news table for admin posts
 
 Revision ID: news_table_001
-Revises: cart_enrichment_001
+Revises: e5f6g7h8i9j0
 Create Date: 2025-11-06 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'news_table_001'
-down_revision = 'cart_enrichment_001'
+down_revision = 'e5f6g7h8i9j0'
 branch_labels = None
 depends_on = None
 

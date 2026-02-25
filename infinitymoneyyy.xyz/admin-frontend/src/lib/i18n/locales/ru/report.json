@@ -1,0 +1,25 @@
+{
+	"title": "Обращения",
+	"total": "{{count}} всего",
+	"noThreads": "Обращения не найдены",
+	"filters": {
+		"all": "Все",
+		"pending": "Ожидающие",
+		"answered": "Отвеченные",
+		"closed": "Закрытые"
+	},
+	"table": {
+		"user": "Юзер",
+		"subject": "Тема",
+		"status": "Статус",
+		"unread": "Непрочит.",
+		"lastMessage": "Последнее сообщение"
+	},
+	"noSubject": "Без темы",
+	"from": "От: {{username}}",
+	"noMessages": "Нет сообщений",
+	"replyPlaceholder": "Введите ответ...",
+	"replySent": "Ответ отправлен",
+	"threadClosed": "Обращение закрыто",
+	"viewThread": "Открыть обращение"
+}

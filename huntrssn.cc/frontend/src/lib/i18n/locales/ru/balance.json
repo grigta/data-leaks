@@ -16,6 +16,7 @@
 	"paymentStatus": "Статус",
 	"copyAddress": "Копировать адрес",
 	"addressCopied": "Адрес скопирован!",
+	"transactionCount": "Транзакций",
 	"transactionHistory": "История транзакций",
 	"noTransactions": "Транзакций пока нет",
 	"table": {

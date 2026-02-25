@@ -2,184 +2,185 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow Orchestration
+
+### 1. Plan Node Default
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately – don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One tack per subagent for focused execution
+
+### 3. Self-Improvement Loop
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
+
+### 4. Verification Before Done
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
+
+### 5. Demand Elegance (Balanced)
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes – don't over-engineer
+- Challenge your own work before presenting it
+
+### 6. Autonomous Bug Fixing
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests – then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+## Task Management
+1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
+2. **Verify Plan**: Check in before starting implementation
+3. **Track Progress**: Mark items complete as you go
+4. **Explain Changes**: High-level summary at each step
+5. **Document Results**: Add review section to `tasks/todo.md`
+6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+
+## Core Principles
+- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
+- **Minimat Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+
+
 ## Язык общения
 
 - Всегда отвечать на русском языке
 - Не делать того, о чем не просят
 
-## Домены и структура папок
-
-```
-/opt/soft/
-├── huntrssn.cc/              # Основной сайт
-│   ├── frontend/             # SvelteKit frontend
-│   ├── api/
-│   │   ├── common -> shared  # Симлинк на общие модули
-│   │   └── public/           # Public API
-│   ├── database -> shared    # Симлинк
-│   ├── alembic -> shared     # Симлинк
-│   └── Dockerfile
-├── infinitymoneyyy.xyz/      # Админка
-│   ├── admin-frontend/       # SvelteKit admin frontend
-│   ├── api/
-│   │   ├── common -> shared  # Симлинк на общие модули
-│   │   └── admin/            # Admin API
-│   └── Dockerfile
-├── shared/                   # Общие компоненты
-│   ├── api/common/           # Общие модули Python
-│   ├── database/             # SQLite модули
-│   ├── alembic/              # Миграции PostgreSQL
-│   └── requirements.txt
-├── bot/                      # Telegram бот
-├── data/                     # SQLite база данных
-├── docker-compose.yml
-├── docker-compose.prod.yml
-└── nginx.conf
-```
-
 ## Архитектура проекта
 
-Это full-stack приложение для управления SSN данными с поиском, e-commerce и SMS функциями.
+Монорепозиторий с тремя доменами, общими модулями и Docker-оркестрацией.
 
-### Основные компоненты
+### Домены
 
-**huntrssn.cc (основной сайт):**
-- `huntrssn.cc/frontend/` - SvelteKit frontend
-- `huntrssn.cc/api/public/` - Public API (порт 8000)
+| Домен | Назначение | Frontend | API | Порт API |
+|-------|-----------|----------|-----|----------|
+| huntrssn.cc | Основной сайт | `huntrssn.cc/frontend/` | `huntrssn.cc/api/public/` | 8000 |
+| infinitymoneyyy.xyz | Админка | `infinitymoneyyy.xyz/admin-frontend/` | `infinitymoneyyy.xyz/api/admin/` | 8002 |
+| qwertyworkforever.top | Портал воркеров | `qwertyworkforever.top/worker-frontend/` | `qwertyworkforever.top/api/` | 8003 |
 
-**infinitymoneyyy.xyz (админка):**
-- `infinitymoneyyy.xyz/admin-frontend/` - SvelteKit admin frontend
-- `infinitymoneyyy.xyz/api/admin/` - Admin API (порт 8002)
+### Общий код (shared/)
 
-**Общие компоненты (shared/):**
-- `shared/api/common/` - Общие модули (database.py, auth.py, models)
-- `shared/database/` - SQLite search engine
-- `shared/alembic/` - PostgreSQL миграции
+Каждый домен имеет симлинки `api/common -> shared/api/common`, `database -> shared/database`, `alembic -> shared/alembic`.
 
-**Базы данных:**
-- PostgreSQL - пользователи, сессии, заказы (shared/api/common/models_postgres.py)
-- SQLite - SSN записи (shared/api/common/models_sqlite.py)
+- `shared/api/common/` — Python модули: auth (JWT), models (PostgreSQL/SQLite), database connections, pricing, external API clients (SearchBug, Whitepages, DaisySMS)
+- `shared/database/` — поисковые движки (SQLite, ClickHouse), bloom/search key генераторы
+- `shared/alembic/` — PostgreSQL миграции (Alembic)
 
-**Nginx:**
-- huntrssn.cc: `/api/public` → public_api:8000, `/` → frontend:3000
-- infinitymoneyyy.xyz: `/api/admin` → admin_api:8002, `/` → admin_frontend:3000
+### Базы данных
+
+- **PostgreSQL** — пользователи, заказы, сессии, тикеты, подписки (`shared/api/common/models_postgres.py`, SQLAlchemy 2.0 async)
+- **ClickHouse** — SSN записи ~135M строк (`shared/database/clickhouse_*.py`), MergeTree с bloom-индексами
+- **SQLite** — SSN записи legacy (`shared/api/common/models_sqlite.py`)
+- **Redis** — distributed rate limiting, WebSocket pub/sub
+
+### Двухуровневый поиск SSN (ClickHouse)
+
+1. **Level 1 — Bloom keys** (`bloom_key_generator.py`): фильтрация по `bloom_key_address` формата `{fn_letter}:{ln_letter}:{addr_number}:{street_word}:{state}`. Lookup-таблицы `ssn_bloom_address_lookup` / `ssn_bloom_phone_lookup` для быстрого доступа.
+2. **Level 2 — Search keys** (`search_key_generator.py`): 16 методов matching (8 с полным именем FN + 8 с первой буквой FN1). Дедупликация по SSN происходит **после** Level 2.
+
+### Nginx routing
+
+- `huntrssn.cc`: `/api/public/` → public_api:8000, `/` → frontend:3000
+- `infinitymoneyyy.xyz`: `/api/admin/` → admin_api:8002, `/` → admin_frontend:3000
+- `qwertyworkforever.top`: `/api/worker/` → worker_api:8003, `/` → worker_frontend:3000
+- Cloudflare real IP через `CF-Connecting-IP`. Rate limit: 10r/s.
+
+## Стек технологий
+
+**Backend:** FastAPI (async) + Uvicorn, SQLAlchemy 2.0 (async), JWT auth (python-jose), Python 3.11
+
+**Frontend:** Svelte 5 (Runes API: `$state`, `$derived`, `$effect`, `$props`), SvelteKit 2, TypeScript, Tailwind CSS 3.4, Vite. UI: bits-ui, flowbite-svelte, @lucide/svelte, svelte-sonner, mode-watcher (dark/light), sveltekit-i18n (en/ru).
+
+**Telegram бот:** aiogram 3.x (`bot/`)
 
 ## Команды для разработки
 
-### Запуск всех сервисов
+**ВАЖНО:** Использовать `docker compose` (без дефиса), не `docker-compose`.
+
+### Docker
 
 ```bash
-# Запустить все сервисы
-docker-compose up -d
-
-# Проверить статус
-docker-compose ps
-
-# Просмотр логов
-docker-compose logs -f [service_name]
+docker compose up -d                              # Запустить все сервисы
+docker compose ps                                 # Статус
+docker compose logs -f public_api                  # Логи конкретного сервиса
+docker compose up -d --build public_api admin_api  # Пересобрать backend
+docker compose up -d --build frontend              # Пересобрать frontend
+docker compose restart nginx                       # Перезапуск nginx
+docker compose exec public_api bash                # Войти в контейнер
 ```
 
-### Работа с базой данных
+### База данных
 
 ```bash
-# Применить миграции Alembic
-docker-compose exec public_api alembic upgrade head
-
-# Создать новую миграцию
-docker-compose exec public_api alembic revision --autogenerate -m "Description"
-
-# Подключиться к PostgreSQL
-docker-compose exec postgres psql -U ssn_user -d ssn_users
+docker compose exec public_api alembic upgrade head                            # Применить миграции
+docker compose exec public_api alembic revision --autogenerate -m "Description" # Новая миграция
+docker compose exec public_api alembic downgrade -1                             # Откат
+docker compose exec postgres psql -U ssn_user -d ssn_users                     # PostgreSQL shell
+docker compose exec clickhouse clickhouse-client                               # ClickHouse shell
 ```
 
-### Frontend разработка
+### Frontend
 
 ```bash
-# huntrssn.cc frontend
-cd huntrssn.cc/frontend
-pnpm install
-pnpm dev  # Порт 5173
-
-# infinitymoneyyy.xyz admin frontend
-cd infinitymoneyyy.xyz/admin-frontend
-pnpm install
-pnpm dev  # Порт 5174
+cd huntrssn.cc/frontend && pnpm install && pnpm dev           # Порт 5173
+cd infinitymoneyyy.xyz/admin-frontend && pnpm install && pnpm dev  # Порт 5174
+pnpm run check   # Проверка типов (svelte-check)
+pnpm run build    # Production сборка
 ```
 
-### Backend разработка
+### Тестирование
 
 ```bash
-# CLI команды (main.py)
-python main.py search ssn 123-45-6789
-python main.py search email test@example.com
+# Python тесты (unittest, из корня проекта)
+python3 -m unittest tests.test_search_engine -v                    # Все тесты поиска (47 тестов)
+python3 -m unittest tests.test_bloom_key_generator -v              # Bloom key тесты
+python3 -m unittest tests.test_search_key_generator -v             # Search key тесты
+python3 -m unittest tests.test_search_engine.TestSearchBySSN -v    # Конкретный класс
+python3 -m unittest discover -s tests -p "test_*.py" -v            # Все тесты
+
+# Frontend тесты
+cd huntrssn.cc/frontend && pnpm test    # Vitest
+
+# Безопасность
+docker compose exec public_api python -m pytest tests/test_sql_injection.py -v
 ```
 
-### Перезапуск и пересборка
+### Линтинг
 
 ```bash
-# Backend API изменения
-docker-compose up -d --build public_api admin_api
-
-# Frontend изменения
-docker-compose up -d --build frontend admin_frontend
-
-# Nginx конфигурация
-docker-compose restart nginx
+ruff check .                    # Python linting (ruff.toml: line-length=120, py311)
+cd huntrssn.cc/frontend && pnpm lint   # Frontend (prettier + eslint)
 ```
-
-## Структура кода
-
-### Backend модули (shared/api/common/)
-
-- `database.py` - подключение к PostgreSQL и SQLite
-- `auth.py` - JWT токены, хеширование паролей
-- `models_postgres.py` - SQLAlchemy модели (User, Order, SMSRental)
-- `models_sqlite.py` - Pydantic модели для SSN данных
-- `searchbug_client.py` - интеграция с SearchBug API
-- `daisysms_client.py` - интеграция с DaisySMS API
-
-### Public API (huntrssn.cc/api/public/)
-
-- `routers/auth.py` - аутентификация
-- `routers/search.py` - поиск SSN
-- `routers/ecommerce.py` - заказы, покупки
-- `routers/sms.py` - SMS сервис
-
-### Admin API (infinitymoneyyy.xyz/api/admin/)
-
-- `routers/users.py` - управление пользователями
-- `routers/tickets.py` - обработка тикетов
-- `routers/analytics.py` - статистика
 
 ## Переменные окружения
 
+Копировать `.env.example` → `.env`. Ключевые переменные:
+
 ```bash
-# PostgreSQL
 DATABASE_URL=postgresql+asyncpg://ssn_user:password@postgres:5432/ssn_users
-
-# JWT
-JWT_SECRET=change_me_long_random_string_min_32_chars
-
-# CORS
+JWT_SECRET=...
+CLICKHOUSE_HOST=clickhouse
+CLICKHOUSE_PORT=9000
+SEARCH_ENGINE_TYPE=sqlite          # sqlite/clickhouse/hybrid
+ENABLE_CLICKHOUSE_WRITES=false
 ALLOWED_ORIGINS=https://huntrssn.cc,https://www.huntrssn.cc
 ALLOWED_ORIGINS_ADMIN=https://infinitymoneyyy.xyz,https://www.infinitymoneyyy.xyz
-
-# SQLite
-SQLITE_PATH=/app/data/ssn_database.db
-```
-
-## Debugging
-
-```bash
-# Логи
-docker-compose logs public_api | grep ERROR
-
-# Войти в контейнер
-docker-compose exec public_api bash
-docker-compose exec frontend sh
 ```
 
 ## Документация API
 
-- Public API Swagger: http://huntrssn.cc/api/public/docs
-- Admin API Swagger: http://infinitymoneyyy.xyz/api/admin/docs
+- Public API: http://huntrssn.cc/api/public/docs
+- Admin API: http://infinitymoneyyy.xyz/api/admin/docs

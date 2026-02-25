@@ -11,14 +11,13 @@ const config: Config = {
 		'/register': ['common', 'navigation', 'auth'],
 		'/dashboard': ['common', 'navigation', 'dashboard', 'search', 'cart'],
 		'/cart': ['common', 'navigation', 'cart'],
+		'/search': ['common', 'navigation', 'search'],
 		'/orders': ['common', 'navigation', 'orders', 'cart'],
 		'/balance': ['common', 'navigation', 'balance', 'crypto'],
-		'/profile': ['common', 'navigation', 'profile'],
 		'/api': ['common', 'navigation', 'api'],
 		'/support': ['common', 'navigation', 'support'],
 		'/contact': ['common', 'navigation', 'contact'],
 		'/manual-ssn': ['common', 'navigation', 'search'],
-		'/subscription': ['common', 'navigation', 'subscription'],
 		'/sms': ['common', 'navigation', 'sms'],
 		// Дефолтный маппинг для всех необработанных маршрутов
 		'*': ['common', 'navigation']

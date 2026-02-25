@@ -1,0 +1,64 @@
+{
+	"title": "Tickets",
+	"description": "View and manage manual SSN search requests",
+	"loadError": "Failed to load tickets",
+	"filters": {
+		"all": "All",
+		"pending": "Pending",
+		"inProgress": "In Progress",
+		"completed": "Completed",
+		"rejected": "Rejected"
+	},
+	"statuses": {
+		"pending": "Pending",
+		"processing": "In Progress",
+		"completed": "Completed",
+		"rejected": "Rejected"
+	},
+	"table": {
+		"id": "ID",
+		"client": "Client",
+		"request": "Request",
+		"status": "Status",
+		"worker": "Worker",
+		"date": "Date",
+		"actions": "Actions"
+	},
+	"empty": "No tickets found",
+	"emptyWithStatus": "No tickets with status \"{{status}}\" found",
+	"detail": {
+		"title": "Ticket Details",
+		"id": "ID",
+		"status": "Status",
+		"client": "Client",
+		"worker": "Worker",
+		"name": "Name",
+		"address": "Address",
+		"response": "Response",
+		"created": "Created",
+		"updated": "Updated"
+	},
+	"reply": {
+		"title": "Reply to Ticket",
+		"client": "Client:",
+		"request": "Request:",
+		"address": "Address:",
+		"complete": "Complete",
+		"reject": "Reject"
+	},
+	"assign": {
+		"title": "Assign Worker",
+		"client": "Client:",
+		"request": "Request:",
+		"selectWorker": "Select Worker",
+		"selectPlaceholder": "-- Select --",
+		"assignButton": "Assign",
+		"selectError": "Select a worker"
+	},
+	"messages": {
+		"assigned": "Ticket assigned",
+		"completed": "Ticket completed",
+		"rejected": "Ticket rejected",
+		"ssnRequired": "SSN is required to complete"
+	}
+}

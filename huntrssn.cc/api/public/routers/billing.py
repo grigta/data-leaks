@@ -20,6 +20,7 @@ from api.common.helket_client import get_helket_client, HelketError
 from api.common.ffio_client import get_ffio_client, FFIOError, get_ffio_currency_code
 from api.common.validators import validate_coupon_code
 from api.public.dependencies import get_current_user, limiter
+from api.public.websocket import publish_user_notification, WebSocketEventType
 import asyncio
 from fastapi import BackgroundTasks
 
@@ -458,6 +459,13 @@ async def apply_coupon_to_balance(
             logger.info(
                 f"Coupon {coupon.code} applied to user {current_user.id} balance: "
                 f"bonus=${bonus_amount}, new_balance=${new_balance}"
+            )
+
+            # Notify about balance change via WebSocket
+            await publish_user_notification(
+                str(current_user.id),
+                WebSocketEventType.BALANCE_UPDATED,
+                {"user_id": str(current_user.id), "new_balance": float(new_balance)}
             )
 
             return ApplyCouponToBalanceResponse(
@@ -1154,6 +1162,13 @@ async def cryptocurrencyapi_ipn(
                     f"amount=${transaction.amount}, new_balance=${new_balance}"
                 )
 
+                # Notify about balance change via WebSocket
+                await publish_user_notification(
+                    str(transaction.user_id),
+                    WebSocketEventType.BALANCE_UPDATED,
+                    {"user_id": str(transaction.user_id), "new_balance": float(new_balance)}
+                )
+
                 return {"status": "success", "message": "Payment processed"}
 
             except Exception as e:
@@ -1296,6 +1311,13 @@ async def helket_ipn(
                     f"amount=${transaction.amount}, new_balance=${new_balance}"
                 )
 
+                # Notify about balance change via WebSocket
+                await publish_user_notification(
+                    str(transaction.user_id),
+                    WebSocketEventType.BALANCE_UPDATED,
+                    {"user_id": str(transaction.user_id), "new_balance": float(new_balance)}
+                )
+
                 return {"status": "success", "message": "Payment processed"}
 
             except Exception as e:
@@ -1409,6 +1431,13 @@ async def poll_ffio_order_status(transaction_id: UUID, db_session_factory):
                         logger.info(
                             f"ff.io payment completed for transaction {transaction_id}: "
                             f"amount=${transaction.amount}, new_balance=${new_balance}"
+                        )
+
+                        # Notify about balance change via WebSocket
+                        await publish_user_notification(
+                            str(transaction.user_id),
+                            WebSocketEventType.BALANCE_UPDATED,
+                            {"user_id": str(transaction.user_id), "new_balance": float(new_balance)}
                         )
                         return  # Stop polling
 

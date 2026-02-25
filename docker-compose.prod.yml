@@ -60,7 +60,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS:-24}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://huntrssn.cc,https://www.huntrssn.cc}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://na71ka921ma.top,https://www.na71ka921ma.top}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_JSON_ENABLED: ${LOG_JSON_ENABLED:-true}
       WHITEPAGES_API_KEY: ${WHITEPAGES_API_KEY}

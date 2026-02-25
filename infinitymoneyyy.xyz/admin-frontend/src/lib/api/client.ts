@@ -75,6 +75,7 @@ export interface AdminLoginRequest {
 export interface TwoFactorSetupResponse {
 	secret: string;
 	provisioning_uri: string;
+	qr_code: string;
 	message?: string;
 }
 
@@ -240,7 +241,10 @@ export interface WorkerResponse {
 	email: string;
 	worker_role: boolean;
 	is_admin: boolean;
+	is_online: boolean;
 	access_code: string;
+	worker_status: 'idle' | 'active' | 'paused';
+	current_shift_started_at: string | null;
 	created_at: string;
 }
 
@@ -588,29 +592,180 @@ export async function deleteNews(news_id: string): Promise<{ message: string }> 
 
 /**
  * Get list of workers
- * Note: This endpoint doesn't exist yet in backend - uses getUserTable with client-side filtering
  */
 export async function getWorkers(params?: {
 	limit?: number;
 	offset?: number;
 }): Promise<WorkerListResponse> {
-	// Use getUserTable and filter for worker_role=true
-	const response = await getUserTable(params);
-	const workers = response.users.filter((user: any) => user.worker_role === true);
+	const response = await adminClient.get<WorkerListResponse>('/workers', { params });
+	return response.data;
+}
 
-	return {
-		workers: workers as WorkerResponse[],
-		total_count: workers.length
-	};
+/**
+ * Generate a new worker access code
+ */
+export async function generateWorkerCode(): Promise<{ message: string; access_code: string }> {
+	const response = await adminClient.post<{ message: string; access_code: string }>(
+		'/workers/generate'
+	);
+	return response.data;
 }
 
 /**
  * Remove worker role from user
- * Note: This endpoint doesn't exist yet in backend - needs to be added first
  */
 export async function removeWorkerRole(user_id: string): Promise<{ message: string }> {
-	const response = await adminClient.patch<{ message: string }>(
-		`/workers/${user_id}/remove-role`
+	const response = await adminClient.delete<{ message: string }>(
+		`/workers/${user_id}`
+	);
+	return response.data;
+}
+
+// Worker Distribution Config
+export interface WorkerDistributionItem {
+	worker_id: string;
+	username: string;
+	is_online: boolean;
+	load_percentage: number | null;
+}
+
+export interface DistributionConfigResponse {
+	distribution_mode: string; // "even" | "percentage"
+	workers: WorkerDistributionItem[];
+}
+
+export interface UpdateDistributionRequest {
+	distribution_mode: string;
+	workers?: { worker_id: string; load_percentage: number | null }[];
+}
+
+/**
+ * Get worker load distribution config
+ */
+export async function getDistributionConfig(): Promise<DistributionConfigResponse> {
+	const response = await adminClient.get<DistributionConfigResponse>('/workers/distribution');
+	return response.data;
+}
+
+/**
+ * Update worker load distribution config
+ */
+export async function updateDistributionConfig(
+	data: UpdateDistributionRequest
+): Promise<{ message: string }> {
+	const response = await adminClient.put<{ message: string }>('/workers/distribution', data);
+	return response.data;
+}
+
+// Worker Stats & Invoices
+
+export interface WorkerStatsItem {
+	worker_id: string;
+	username: string;
+	total_assigned: number;
+	total_completed: number;
+	total_rejected: number;
+	avg_completion_time_minutes: number | null;
+	dynamic_cost_instant: string;
+	dynamic_cost_manual: string;
+	total_earned: string;
+	total_paid: string;
+	debt: string;
+	wallet_address: string | null;
+	wallet_network: string | null;
+}
+
+export interface WorkerInvoiceItem {
+	id: string;
+	worker_id: string;
+	worker_username: string;
+	amount: string;
+	wallet_address: string;
+	wallet_network: string;
+	status: string;
+	paid_at: string | null;
+	created_at: string;
+}
+
+export interface WorkerInvoiceListResponse {
+	invoices: WorkerInvoiceItem[];
+	total_count: number;
+	pending_count: number;
+}
+
+export async function getWorkerStats(): Promise<WorkerStatsItem[]> {
+	const response = await adminClient.get<WorkerStatsItem[]>('/workers/stats');
+	return response.data;
+}
+
+export async function getWorkerInvoices(params?: {
+	status_filter?: string;
+	worker_id?: string;
+	limit?: number;
+	offset?: number;
+}): Promise<WorkerInvoiceListResponse> {
+	const response = await adminClient.get<WorkerInvoiceListResponse>('/workers/invoices', {
+		params
+	});
+	return response.data;
+}
+
+export async function getPendingInvoiceCount(): Promise<number> {
+	const response = await adminClient.get<{ count: number }>('/workers/invoices/pending-count');
+	return response.data.count;
+}
+
+export async function markInvoicePaid(invoiceId: string): Promise<WorkerInvoiceItem> {
+	const response = await adminClient.post<WorkerInvoiceItem>(
+		`/workers/invoices/${invoiceId}/pay`
+	);
+	return response.data;
+}
+
+export async function getWorkerInvoicesById(
+	workerId: string,
+	params?: { limit?: number; offset?: number }
+): Promise<WorkerInvoiceListResponse> {
+	const response = await adminClient.get<WorkerInvoiceListResponse>(
+		`/workers/${workerId}/invoices`,
+		{ params }
+	);
+	return response.data;
+}
+
+// Worker Shift API
+
+export interface WorkerShiftResponse {
+	id: string;
+	started_at: string;
+	ended_at: string | null;
+	duration_seconds: number;
+	pause_duration_seconds: number;
+	tickets_completed: number;
+	tickets_rejected: number;
+}
+
+export interface WorkerShiftListResponse {
+	shifts: WorkerShiftResponse[];
+	total_count: number;
+}
+
+export async function getWorkerShifts(
+	workerId: string,
+	params?: { limit?: number; offset?: number }
+): Promise<WorkerShiftListResponse> {
+	const response = await adminClient.get<WorkerShiftListResponse>(
+		`/workers/${workerId}/shifts`,
+		{ params }
+	);
+	return response.data;
+}
+
+export async function forceStopWorkerShift(
+	workerId: string
+): Promise<{ message: string }> {
+	const response = await adminClient.post<{ message: string }>(
+		`/workers/${workerId}/force-stop`
 	);
 	return response.data;
 }
@@ -821,6 +976,7 @@ export interface OrderItemResponse {
 	items: any;
 	total_price: number;
 	status: string;
+	order_type: string;
 	is_viewed: boolean;
 	created_at: string;
 	updated_at: string;
@@ -998,15 +1154,49 @@ export interface RespondToMessageRequest {
 	status?: string;
 }
 
+export interface FailedItemResponse {
+	id: string;
+	user_id: string;
+	username: string;
+	input_fullname: string;
+	input_address: string;
+	reason: string; // 'not_found' | 'api_error'
+	error_message: string | null;
+	search_time: number | null;
+	created_at: string;
+}
+
+export interface FailedListResponse {
+	items: FailedItemResponse[];
+	total_count: number;
+	page: number;
+	page_size: number;
+}
+
 /**
  * Get orders list
  */
 export async function getOrders(params?: {
 	status_filter?: string;
+	type_filter?: string;
+	search?: string;
 	limit?: number;
 	offset?: number;
 }): Promise<OrderListResponse> {
 	const response = await adminClient.get<OrderListResponse>('/orders/', { params });
+	return response.data;
+}
+
+/**
+ * Get failed searches (not found + API errors)
+ */
+export async function getFailedSearches(params?: {
+	reason_filter?: string;
+	search?: string;
+	limit?: number;
+	offset?: number;
+}): Promise<FailedListResponse> {
+	const response = await adminClient.get<FailedListResponse>('/orders/not-found', { params });
 	return response.data;
 }
 
@@ -1376,6 +1566,113 @@ export async function toggleCustomPricing(id: string): Promise<CustomPricingResp
 	return response.data;
 }
 
+// Profit Analytics Interfaces
+
+export interface ProfitDashboardResponse {
+	total_profit: number;
+	total_roi: number;
+	total_deposits: number;
+	instant_revenue: number;
+	instant_cost: number;
+	instant_profit: number;
+	instant_roi: number;
+	instant_success_rate: number;
+	instant_total_attempts: number;
+	instant_successful: number;
+	manual_revenue: number;
+	manual_cost: number;
+	manual_profit: number;
+	manual_roi: number;
+	manual_success_rate: number;
+	manual_total_attempts: number;
+	manual_successful: number;
+	total_searches: number;
+	instant_found: number;
+	manual_found: number;
+	not_found: number;
+	instant_avg_search_time: number | null;
+	manual_avg_response_time: number | null;
+	avg_deposit: number;
+	period: string;
+}
+
+export interface ProfitUserItem {
+	id: string;
+	username: string;
+	search_price: number;
+	search_mode: string;
+	total_profit: number;
+	instant_profit: number;
+	manual_profit: number;
+	instant_roi: number;
+	instant_success_rate: number;
+	manual_roi: number;
+	manual_success_rate: number;
+	total_deposited: number;
+	balance: number;
+	created_at: string;
+	is_banned: boolean;
+}
+
+export interface ProfitUsersResponse {
+	users: ProfitUserItem[];
+	total_count: number;
+	page: number;
+	page_size: number;
+}
+
+export interface AddBalanceResponse {
+	message: string;
+	user_id: string;
+	username: string;
+	new_balance: number;
+}
+
+export interface SetSearchModeResponse {
+	message: string;
+	user_id: string;
+	username: string;
+	search_mode: string;
+}
+
+// Profit Analytics API
+
+export async function getProfitDashboard(params?: {
+	period?: string;
+}): Promise<ProfitDashboardResponse> {
+	const response = await adminClient.get<ProfitDashboardResponse>('/analytics/profit-dashboard', { params });
+	return response.data;
+}
+
+export async function clearProfitDashboardStats(params: { period: string }): Promise<{ status: string; cleared: string }> {
+	const response = await adminClient.delete<{ status: string; cleared: string }>('/analytics/profit-dashboard/clear', { params });
+	return response.data;
+}
+
+export async function getProfitUsers(params?: {
+	period?: string;
+	limit?: number;
+	offset?: number;
+	search?: string;
+	sort_by?: string;
+	sort_order?: string;
+}): Promise<ProfitUsersResponse> {
+	const response = await adminClient.get<ProfitUsersResponse>('/analytics/profit-users', { params });
+	return response.data;
+}
+
+export async function addUserBalance(userId: string, amount: number): Promise<AddBalanceResponse> {
+	const response = await adminClient.post<AddBalanceResponse>(`/users/${userId}/add-balance`, { amount });
+	return response.data;
+}
+
+export async function setUserSearchMode(userId: string, searchMode: string): Promise<SetSearchModeResponse> {
+	const response = await adminClient.patch<SetSearchModeResponse>(`/users/${userId}/search-mode`, {
+		search_mode: searchMode
+	});
+	return response.data;
+}
+
 // Error handling helper
 export function handleApiError(error: AxiosError): string {
 	if (error.response) {
@@ -1440,5 +1737,332 @@ export async function banUser(user_id: string, reason: string): Promise<BanUserR
 	const response = await adminClient.post<BanUserResponse>(`/users/${user_id}/ban`, {
 		reason
 	});
+	return response.data;
+}
+
+
+// ============================================
+// API Error Logs
+// ============================================
+
+export interface ErrorLogItem {
+	id: string;
+	api_name: string;
+	method: string;
+	error_type: string;
+	error_message: string;
+	status_code: number | null;
+	request_params: Record<string, any> | null;
+	created_at: string;
+}
+
+export interface ErrorLogsResponse {
+	items: ErrorLogItem[];
+	total: number;
+	page: number;
+	page_size: number;
+}
+
+export interface ErrorStatsResponse {
+	total_errors: number;
+	errors_today: number;
+	errors_by_api: Record<string, number>;
+}
+
+export async function getErrorLogs(params: {
+	page?: number;
+	page_size?: number;
+	api_name?: string;
+	error_type?: string;
+}): Promise<ErrorLogsResponse> {
+	const response = await adminClient.get<ErrorLogsResponse>('/errors', { params });
+	return response.data;
+}
+
+export async function getErrorStats(): Promise<ErrorStatsResponse> {
+	const response = await adminClient.get<ErrorStatsResponse>('/errors/stats');
+	return response.data;
+}
+
+export async function cleanupOldErrors(): Promise<{ deleted: number }> {
+	const response = await adminClient.delete<{ deleted: number }>('/errors/cleanup');
+	return response.data;
+}
+
+// ============================================
+// Settings API
+// ============================================
+
+export interface SearchFlowResponse {
+	search_flow: string;
+	updated_at: string | null;
+}
+
+export interface SearchFlowOption {
+	value: string;
+	label: string;
+	description: string;
+}
+
+export async function getSearchFlow(): Promise<SearchFlowResponse> {
+	const response = await adminClient.get<SearchFlowResponse>('/settings/search-flow');
+	return response.data;
+}
+
+export async function updateSearchFlow(search_flow: string): Promise<SearchFlowResponse> {
+	const response = await adminClient.put<SearchFlowResponse>('/settings/search-flow', {
+		search_flow
+	});
+	return response.data;
+}
+
+export async function getSearchFlowOptions(): Promise<{ options: SearchFlowOption[] }> {
+	const response = await adminClient.get<{ options: SearchFlowOption[] }>(
+		'/settings/search-flow/options'
+	);
+	return response.data;
+}
+
+// API Costs
+
+export interface ApiCostsResponse {
+	costs: Record<string, string>;
+	labels: Record<string, string>;
+}
+
+export async function getApiCosts(): Promise<ApiCostsResponse> {
+	const response = await adminClient.get<ApiCostsResponse>('/settings/api-costs');
+	return response.data;
+}
+
+export async function updateApiCosts(costs: Record<string, string>): Promise<ApiCostsResponse> {
+	const response = await adminClient.put<ApiCostsResponse>('/settings/api-costs', { costs });
+	return response.data;
+}
+
+// SearchBug API Keys
+
+export interface SearchbugKeysResponse {
+	co_code: string;
+	has_password: boolean;
+	source: string;
+	updated_at: string | null;
+}
+
+export interface UpdateSearchbugKeysRequest {
+	co_code?: string;
+	password?: string;
+}
+
+export async function getSearchbugKeys(): Promise<SearchbugKeysResponse> {
+	const response = await adminClient.get<SearchbugKeysResponse>('/settings/searchbug-keys');
+	return response.data;
+}
+
+export async function updateSearchbugKeys(
+	data: UpdateSearchbugKeysRequest
+): Promise<SearchbugKeysResponse> {
+	const response = await adminClient.put<SearchbugKeysResponse>(
+		'/settings/searchbug-keys',
+		data
+	);
+	return response.data;
+}
+
+// ── Test Polygon ────────────────────────────────────────────
+
+export interface TestPolygonRecord {
+	id: string;
+	fullname: string;
+	address: string;
+	expected_ssn: string;
+	sort_order: number;
+}
+
+export interface TestPolygonLastRun {
+	id: string;
+	status: string;
+	total_records: number;
+	matched_count: number;
+	not_found_count: number;
+	wrong_ssn_count: number;
+	error_count: number;
+	match_rate: number;
+	flow_config: Record<string, unknown> | null;
+	finished_at: string | null;
+	created_at: string;
+}
+
+export interface TestPolygonTest {
+	id: string;
+	name: string;
+	description: string | null;
+	records_count: number;
+	created_at: string;
+	updated_at: string;
+	last_run: TestPolygonLastRun | null;
+}
+
+export interface TestPolygonTestDetail {
+	id: string;
+	name: string;
+	description: string | null;
+	records: TestPolygonRecord[];
+	created_at: string;
+	updated_at: string;
+}
+
+export interface TestPolygonRun {
+	id: string;
+	test_id: string;
+	test_name: string;
+	flow_config: Record<string, unknown> | null;
+	status: string;
+	total_records: number;
+	processed_count: number;
+	matched_count: number;
+	not_found_count: number;
+	wrong_ssn_count: number;
+	error_count: number;
+	started_at: string | null;
+	finished_at: string | null;
+	created_at: string;
+}
+
+export interface TestPolygonResult {
+	id: string;
+	record_id: string;
+	fullname: string;
+	address: string;
+	expected_ssn: string;
+	status: string;
+	found_ssn: string | null;
+	best_method: string | null;
+	matched_keys_count: number;
+	total_candidates: number;
+	search_time: number | null;
+	error_message: string | null;
+	sort_order: number;
+}
+
+export interface TestPolygonDebugData {
+	searchbug_data: {
+		firstname: string;
+		middlename: string | null;
+		lastname: string;
+		dob: string;
+		phones: string[];
+		addresses: Array<{ address: string; state: string }>;
+	};
+	bloom_keys_phone: Array<{ key: string; found: boolean; count: number }>;
+	bloom_keys_address: Array<{ key: string; found: boolean; count: number }>;
+	level1_candidates_count: number;
+	query_keys: Array<{ key: string; method: string; matched: boolean }>;
+	candidates: Array<{
+		ssn: string;
+		firstname: string;
+		lastname: string;
+		middlename: string;
+		dob: string;
+		address: string;
+		phone: string;
+		source_table: string;
+		matched_keys: string[];
+		matched_keys_count: number;
+		best_priority: number | null;
+	}>;
+	final_results: Array<{
+		ssn: string;
+		matched_keys: string[];
+		matched_keys_count: number;
+		best_priority: number | null;
+		firstname: string;
+		lastname: string;
+		address: string;
+	}>;
+}
+
+export interface TestPolygonResultDebug {
+	id: string;
+	record_id: string;
+	fullname: string;
+	address: string;
+	expected_ssn: string;
+	status: string;
+	found_ssn: string | null;
+	best_method: string | null;
+	matched_keys_count: number;
+	total_candidates: number;
+	search_time: number | null;
+	error_message: string | null;
+	debug_data: TestPolygonDebugData | null;
+}
+
+export async function getTestPolygonTests(params?: {
+	limit?: number;
+	offset?: number;
+}): Promise<{ tests: TestPolygonTest[]; total_count: number }> {
+	const response = await adminClient.get('/test-polygon/tests', { params });
+	return response.data;
+}
+
+export async function createTestPolygonTest(data: {
+	name: string;
+	description?: string;
+	records: Array<{ fullname: string; address: string; expected_ssn: string }>;
+}): Promise<TestPolygonTest> {
+	const response = await adminClient.post('/test-polygon/tests', data);
+	return response.data;
+}
+
+export async function getTestPolygonTest(id: string): Promise<TestPolygonTestDetail> {
+	const response = await adminClient.get(`/test-polygon/tests/${id}`);
+	return response.data;
+}
+
+export async function updateTestPolygonTest(
+	id: string,
+	data: {
+		name?: string;
+		description?: string;
+		records?: Array<{ fullname: string; address: string; expected_ssn: string }>;
+	}
+): Promise<TestPolygonTest> {
+	const response = await adminClient.put(`/test-polygon/tests/${id}`, data);
+	return response.data;
+}
+
+export async function deleteTestPolygonTest(id: string): Promise<void> {
+	await adminClient.delete(`/test-polygon/tests/${id}`);
+}
+
+export async function runTestPolygonTest(
+	testId: string,
+	config: { provider?: string; save_debug?: boolean; parallelism?: number; prioritization?: string }
+): Promise<TestPolygonRun> {
+	const response = await adminClient.post(`/test-polygon/tests/${testId}/run`, config);
+	return response.data;
+}
+
+export async function getTestPolygonRun(runId: string): Promise<TestPolygonRun> {
+	const response = await adminClient.get(`/test-polygon/runs/${runId}`);
+	return response.data;
+}
+
+export async function getTestPolygonResults(
+	runId: string,
+	params?: { status_filter?: string; limit?: number; offset?: number }
+): Promise<{ results: TestPolygonResult[]; total_count: number }> {
+	const response = await adminClient.get(`/test-polygon/runs/${runId}/results`, { params });
+	return response.data;
+}
+
+export async function getTestPolygonResultDebug(
+	runId: string,
+	resultId: string
+): Promise<TestPolygonResultDebug> {
+	const response = await adminClient.get(
+		`/test-polygon/runs/${runId}/results/${resultId}/debug`
+	);
 	return response.data;
 }

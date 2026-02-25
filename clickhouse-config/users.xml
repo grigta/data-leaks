@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <profiles>
+        <default>
+            <!-- Отключаем лимит памяти (0 = unlimited) -->
+            <max_memory_usage>0</max_memory_usage>
+            <max_memory_usage_for_user>0</max_memory_usage_for_user>
+            <!-- 32 ядра, 60GB RAM — используем полноценно -->
+            <max_threads>16</max_threads>
+            <!-- Настройки для mutations -->
+            <mutations_sync>0</mutations_sync>
+            <!-- Разрешаем overcommit памяти -->
+            <memory_overcommit_ratio_denominator>1</memory_overcommit_ratio_denominator>
+        </default>
+    </profiles>
+</clickhouse>

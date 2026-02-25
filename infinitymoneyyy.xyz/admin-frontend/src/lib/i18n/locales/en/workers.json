@@ -1,0 +1,66 @@
+{
+	"title": "Workers",
+	"total": "{{count}} total",
+	"noWorkers": "No workers yet",
+	"onlineCount": "{{count}} online",
+	"generateCode": "Generate Access Code",
+	"pendingInvoices": "Pending invoices",
+	"distribution": {
+		"title": "Load Distribution",
+		"mode": "Mode:",
+		"even": "Even",
+		"percentage": "Percentage",
+		"distributeEvenly": "Distribute evenly",
+		"total": "Total: {{sum}}%",
+		"sumError": "Percentages must sum to 100 (current: {{sum}})",
+		"saved": "Distribution config saved",
+		"evenDescription": "Tickets are distributed equally among online workers based on current workload."
+	},
+	"table": {
+		"status": "Status",
+		"username": "Username",
+		"accessCode": "Access Code",
+		"assigned": "Assigned",
+		"completed": "Completed",
+		"avgTime": "Avg Time",
+		"earned": "Earned",
+		"debt": "Debt",
+		"created": "Created",
+		"actions": "Actions"
+	},
+	"clickToCopy": "Click to copy",
+	"copied": "Copied",
+	"copyFailed": "Failed to copy",
+	"generate": {
+		"title": "Generate Worker Access Code",
+		"successMessage": "Access code generated. Share it with the worker.",
+		"confirmMessage": "A new worker account will be created with a unique access code.",
+		"generated": "Access code generated",
+		"done": "Done",
+		"generate": "Generate"
+	},
+	"remove": {
+		"title": "Remove Worker",
+		"confirm": "Remove worker role from <strong>{{username}}</strong>?",
+		"remove": "Remove",
+		"removed": "Worker {{username}} removed"
+	},
+	"invoices": {
+		"title": "Invoices — {{username}}",
+		"wallet": "Wallet:",
+		"network": "Network:",
+		"earned": "Earned:",
+		"paid": "Paid:",
+		"debt": "Debt:",
+		"noInvoices": "No invoices",
+		"markPaid": "Mark Paid",
+		"paidStatus": "Paid",
+		"markedPaid": "Invoice marked as paid",
+		"notSet": "Not set"
+	},
+	"pendingRequests": {
+		"title": "Pending Withdraw Requests",
+		"noPending": "No pending invoices",
+		"newRequest": "New worker withdraw request"
+	}
+}

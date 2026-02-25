@@ -1,0 +1,32 @@
+{
+	"loading": "Загрузка...",
+	"save": "Сохранить",
+	"saving": "Сохранение...",
+	"saved": "Сохранено",
+	"cancel": "Отмена",
+	"close": "Закрыть",
+	"back": "Назад",
+	"confirm": "Подтвердить",
+	"confirming": "Подтверждение...",
+	"refresh": "Обновить",
+	"delete": "Удалить",
+	"search": "Поиск...",
+	"all": "Все",
+	"noData": "Нет данных",
+	"error": "Ошибка",
+	"success": "Успешно",
+	"actions": "Действия",
+	"status": "Статус",
+	"date": "Дата",
+	"id": "ID",
+	"pagination": {
+		"page": "Страница {{current}} из {{total}}",
+		"records": "{{total}} записей, страница {{current}} из {{totalPages}}",
+		"showing": "{{start}}-{{end}} из {{total}}"
+	},
+	"connected": "Подключено",
+	"disconnected": "Отключено",
+	"administrator": "Администратор",
+	"online": "Онлайн",
+	"offline": "Оффлайн"
+}

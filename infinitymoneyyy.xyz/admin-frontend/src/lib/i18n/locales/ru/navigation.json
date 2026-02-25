@@ -1,0 +1,18 @@
+{
+	"adminPanel": "Админ панель",
+	"profitDashboard": "Аналитика прибыли",
+	"profitUsers": "Юзеры (прибыль)",
+	"report": "Репорт",
+	"workers": "Воркеры",
+	"apiErrors": "API ошибки",
+	"allOrders": "Все заказы",
+	"settings": "Настройки",
+	"testPolygon": "Тест Полигон",
+	"myAccount": "Мой аккаунт",
+	"theme": "Тема оформления",
+	"themeLight": "Светлая",
+	"themeDark": "Тёмная",
+	"themeSystem": "Системная",
+	"loggingOut": "Выход из системы...",
+	"logout": "Выход"
+}

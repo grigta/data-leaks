@@ -10,22 +10,23 @@ from typing import List, Optional
 from uuid import UUID
 
 import aiohttp
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from api.admin.dependencies import get_current_admin_user, get_current_admin_or_worker_user
+from api.admin.dependencies import get_current_admin_user
 from api.admin.websocket import ws_manager
 from api.common.database import get_postgres_session
-from api.common.models_postgres import ManualSSNTicket, TicketStatus, User, Order, OrderStatus, OrderType
+from api.common.models_postgres import ManualSSNTicket, TicketStatus, User, Order, OrderStatus, OrderType, AppSettings
 from api.public.dependencies import get_current_user
 from decimal import Decimal
 
 # Configuration for internal API calls
 PUBLIC_API_INTERNAL_URL = os.getenv("PUBLIC_API_INTERNAL_URL", "http://public_api:8000")
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
+WORKER_API_URL = os.getenv("WORKER_API_URL", "http://worker_api:8003")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ async def create_ticket(
     """
     Create a new manual SSN ticket.
     Available to all authenticated users.
+    Auto-assigns to an online worker with the fewest active tickets.
     """
     try:
         # Create new ticket
@@ -116,6 +118,113 @@ async def create_ticket(
             status=TicketStatus.pending
         )
 
+        # Auto-assign to online worker based on distribution config
+        online_worker_ids = []
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as http_client:
+                resp = await http_client.get(f"{WORKER_API_URL}/internal/online-workers")
+                if resp.status_code == 200:
+                    online_worker_ids = resp.json().get("online_worker_ids", [])
+        except Exception as e:
+            logger.warning(f"Failed to fetch online workers: {e}")
+        assigned_worker = None
+
+        if online_worker_ids:
+            # Get distribution mode
+            setting = await db.execute(
+                select(AppSettings).where(AppSettings.key == "worker_distribution_mode")
+            )
+            mode_row = setting.scalar_one_or_none()
+            dist_mode = mode_row.value if mode_row else "even"
+
+            worker_uuids = [UUID(wid) for wid in online_worker_ids]
+
+            # Filter only workers with active shift (worker_status == 'active')
+            active_workers_result = await db.execute(
+                select(User.id).where(
+                    User.id.in_(worker_uuids),
+                    User.worker_status == 'active',
+                )
+            )
+            active_ids = [str(row.id) for row in active_workers_result]
+            if active_ids:
+                worker_uuids = [UUID(wid) for wid in active_ids]
+                online_worker_ids = active_ids
+            else:
+                # No active workers — ticket stays pending
+                worker_uuids = []
+                online_worker_ids = []
+
+            # Count active tickets per online worker
+            ticket_counts_query = (
+                select(
+                    ManualSSNTicket.worker_id,
+                    func.count(ManualSSNTicket.id).label("active_count")
+                )
+                .where(
+                    ManualSSNTicket.worker_id.in_(worker_uuids),
+                    ManualSSNTicket.status.in_([TicketStatus.pending, TicketStatus.processing])
+                )
+                .group_by(ManualSSNTicket.worker_id)
+            )
+            result_counts = await db.execute(ticket_counts_query)
+            counts_map = {str(row.worker_id): row.active_count for row in result_counts}
+
+            best_worker_id = None
+
+            if dist_mode == "percentage":
+                # Get workers with their load_percentage
+                workers_result = await db.execute(
+                    select(User).where(
+                        User.id.in_(worker_uuids),
+                        User.load_percentage.isnot(None),
+                        User.load_percentage > 0,
+                    )
+                )
+                workers_with_pct = workers_result.scalars().all()
+
+                if workers_with_pct:
+                    # Count ALL completed+active tickets per worker (for ratio calculation)
+                    all_counts_query = (
+                        select(
+                            ManualSSNTicket.worker_id,
+                            func.count(ManualSSNTicket.id).label("total_count")
+                        )
+                        .where(ManualSSNTicket.worker_id.in_(worker_uuids))
+                        .group_by(ManualSSNTicket.worker_id)
+                    )
+                    all_result = await db.execute(all_counts_query)
+                    all_counts = {str(r.worker_id): r.total_count for r in all_result}
+
+                    # Find worker with biggest gap: target_ratio - actual_ratio
+                    total_all = sum(all_counts.values()) or 1
+                    best_gap = -float("inf")
+                    for w in workers_with_pct:
+                        wid = str(w.id)
+                        if wid not in online_worker_ids:
+                            continue
+                        target_ratio = w.load_percentage / 100.0
+                        actual_ratio = all_counts.get(wid, 0) / total_all
+                        gap = target_ratio - actual_ratio
+                        if gap > best_gap:
+                            best_gap = gap
+                            best_worker_id = wid
+
+            if not best_worker_id:
+                # Even mode (or percentage fallback): least active tickets
+                min_count = float('inf')
+                for wid in online_worker_ids:
+                    count = counts_map.get(wid, 0)
+                    if count < min_count:
+                        min_count = count
+                        best_worker_id = wid
+
+            if best_worker_id:
+                ticket.worker_id = UUID(best_worker_id)
+                ticket.status = TicketStatus.processing
+                assigned_worker = best_worker_id
+                logger.info(f"Auto-assigned ticket to worker {best_worker_id} (mode: {dist_mode})")
+
         db.add(ticket)
         await db.commit()
         await db.refresh(ticket)
@@ -123,7 +232,10 @@ async def create_ticket(
         # Load relationships
         result = await db.execute(
             select(ManualSSNTicket)
-            .options(selectinload(ManualSSNTicket.user))
+            .options(
+                selectinload(ManualSSNTicket.user),
+                selectinload(ManualSSNTicket.worker)
+            )
             .where(ManualSSNTicket.id == ticket.id)
         )
         ticket = result.scalar_one()
@@ -137,6 +249,8 @@ async def create_ticket(
             "lastname": ticket.lastname,
             "address": ticket.address,
             "status": ticket.status.value,
+            "worker_id": str(ticket.worker_id) if ticket.worker_id else None,
+            "worker_username": ticket.worker.username if ticket.worker else None,
             "created_at": ticket.created_at.isoformat()
         }
 
@@ -146,13 +260,19 @@ async def create_ticket(
         except Exception as ws_error:
             logger.error(f"WebSocket broadcast failed: {ws_error}")
 
+        # Notify assigned worker via WebSocket
+        if assigned_worker:
+            try:
+                await ws_manager.broadcast_to_worker(assigned_worker, "ticket_created", ticket_data)
+            except Exception as ws_error:
+                logger.error(f"WebSocket worker notification failed: {ws_error}")
+
         # Notify ticket creator via Public API internal endpoint
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/notify-ticket-created",
                     json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
-                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Public API: HTTP {response.status}")
@@ -177,7 +297,7 @@ async def create_ticket(
 @router.get("/pending-count")
 async def get_pending_tickets_count(
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Get count of pending tickets for current user.
@@ -190,11 +310,6 @@ async def get_pending_tickets_count(
         count_query = select(func.count()).select_from(ManualSSNTicket).where(
             ManualSSNTicket.status == TicketStatus.pending
         )
-
-        # Role-based filtering
-        if current_user.worker_role and not current_user.is_admin:
-            # Workers see only their assigned pending tickets
-            count_query = count_query.where(ManualSSNTicket.worker_id == current_user.id)
 
         result = await db.execute(count_query)
         count = result.scalar_one()
@@ -215,7 +330,7 @@ async def list_tickets(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     List tickets with role-based filtering.
@@ -241,21 +356,12 @@ async def list_tickets(
                     detail=f"Invalid status. Must be one of: {[s.value for s in TicketStatus]}"
                 )
 
-        # Role-based filtering
-        if current_user.worker_role and not current_user.is_admin:
-            # Workers see only their assigned tickets
-            query = query.where(ManualSSNTicket.worker_id == current_user.id)
-            logger.info(f"Worker {current_user.username} listing their assigned tickets")
-        else:
-            # Full admins see all tickets
-            logger.info(f"Admin {current_user.username} listing all tickets")
+        logger.info(f"Admin {current_user.username} listing all tickets")
 
         # Get total count with same filters
         count_query = select(func.count()).select_from(ManualSSNTicket)
         if status_filter:
             count_query = count_query.where(ManualSSNTicket.status == status_enum)
-        if current_user.worker_role and not current_user.is_admin:
-            count_query = count_query.where(ManualSSNTicket.worker_id == current_user.id)
 
         total_result = await db.execute(count_query)
         total_count = total_result.scalar_one()
@@ -290,7 +396,7 @@ async def get_unassigned_tickets(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Get all unassigned pending tickets.
@@ -344,7 +450,7 @@ async def get_unassigned_tickets(
 async def get_ticket(
     ticket_id: UUID,
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Get ticket details.
@@ -369,16 +475,6 @@ async def get_ticket(
                 detail="Ticket not found"
             )
 
-        # Authorization check
-        is_admin = current_user.is_admin and not current_user.worker_role
-        is_assigned_worker = ticket.worker_id == current_user.id
-
-        if not (is_admin or is_assigned_worker):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to view this ticket"
-            )
-
         return TicketResponse.from_ticket(ticket)
 
     except HTTPException:
@@ -396,7 +492,7 @@ async def update_ticket(
     ticket_id: UUID,
     request: UpdateTicketRequest,
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Update ticket status and/or response data.
@@ -423,16 +519,6 @@ async def update_ticket(
                 detail="Ticket not found"
             )
 
-        # Authorization check
-        is_admin = current_user.is_admin and not current_user.worker_role
-        is_assigned_worker = ticket.worker_id == current_user.id
-
-        if not (is_admin or is_assigned_worker):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this ticket"
-            )
-
         # Update fields
         if request.status is not None:
             try:
@@ -457,7 +543,6 @@ async def update_ticket(
             order_item = {
                 "source": "manual_ticket",
                 "ticket_id": str(ticket.id),
-                "price": "0.00",  # Already paid when creating ticket
                 "firstname": ticket.firstname,
                 "lastname": ticket.lastname,
                 "address": ticket.address,
@@ -467,11 +552,17 @@ async def update_ticket(
             # Add response_data
             order_item.update(ticket.response_data)
 
+            # Get user's actual search price
+            from api.common.pricing import get_user_price_by_id, get_default_instant_ssn_price
+            default_instant_price = await get_default_instant_ssn_price(db)
+            user_price = await get_user_price_by_id(db, ticket.user_id, 'instant_ssn', default_instant_price)
+            order_item["price"] = str(user_price)
+
             # Create order
             new_order = Order(
                 user_id=ticket.user_id,
                 items=[order_item],
-                total_price=Decimal("0.00"),
+                total_price=user_price,
                 status=OrderStatus.completed,
                 order_type=OrderType.manual_ssn,
                 is_viewed=False
@@ -527,7 +618,6 @@ async def update_ticket(
                 async with session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/{endpoint}",
                     json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
-                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Public API: HTTP {response.status}")
@@ -650,7 +740,6 @@ async def assign_ticket(
                 async with session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/notify-ticket-updated",
                     json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
-                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Public API: HTTP {response.status}")
@@ -678,7 +767,7 @@ async def assign_ticket(
 async def move_ticket_to_order(
     ticket_id: UUID,
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
     Move a completed ticket to orders (worker/admin only).
@@ -713,17 +802,7 @@ async def move_ticket_to_order(
                 detail="Ticket not found"
             )
 
-        # Step 2: Authorization check
-        is_admin = current_user.is_admin and not current_user.worker_role
-        is_assigned_worker = ticket.worker_id == current_user.id
-
-        if not (is_admin or is_assigned_worker):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to move this ticket. Only assigned worker or admin can move tickets."
-            )
-
-        # Step 3: Validate ticket status - only completed tickets can be moved
+        # Step 2: Validate ticket status - only completed tickets can be moved
         if ticket.status != TicketStatus.completed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -738,13 +817,17 @@ async def move_ticket_to_order(
             )
 
         # Step 5: Prepare order items from ticket data
+        from api.common.pricing import get_user_price_by_id, get_default_instant_ssn_price
+        default_instant_price = await get_default_instant_ssn_price(db)
+        user_price = await get_user_price_by_id(db, ticket.user_id, 'instant_ssn', default_instant_price)
+
         order_items = []
 
         # Base item with ticket metadata
         order_item = {
             "source": "manual_ticket",
             "ticket_id": str(ticket.id),
-            "price": "0.00",  # Already paid when creating ticket
+            "price": str(user_price),
             "firstname": ticket.firstname,
             "lastname": ticket.lastname,
             "address": ticket.address,
@@ -762,7 +845,7 @@ async def move_ticket_to_order(
         new_order = Order(
             user_id=ticket.user_id,  # Order belongs to the ticket owner
             items=order_items,
-            total_price=Decimal("0.00"),
+            total_price=user_price,
             status=OrderStatus.completed,
             order_type=OrderType.manual_ssn,
             is_viewed=False
@@ -815,20 +898,13 @@ async def move_ticket_to_order(
 async def claim_ticket(
     ticket_id: UUID,
     db: AsyncSession = Depends(get_postgres_session),
-    current_user: User = Depends(get_current_admin_or_worker_user)
+    current_user: User = Depends(get_current_admin_user)
 ):
     """
-    Allow a worker to claim an unassigned ticket.
-    Available to both workers and admins.
+    Allow an admin to claim an unassigned ticket.
+    Admin-only endpoint.
     """
     try:
-        # Check if user is a worker
-        if not current_user.worker_role and not current_user.is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only workers can claim tickets"
-            )
-
         # Get the ticket with lock
         result = await db.execute(
             select(ManualSSNTicket)

@@ -53,6 +53,7 @@ class UserResponse(BaseModel):
     jabber: Optional[str] = None
     balance: float
     access_code: Optional[str] = None
+    is_admin: Optional[bool] = False
     is_banned: Optional[bool] = False
     ban_reason: Optional[str] = None
     banned_at: Optional[datetime] = None
@@ -60,6 +61,7 @@ class UserResponse(BaseModel):
     invitation_code: Optional[str] = None
     invited_by: Optional[str] = None
     invitation_bonus_received: Optional[bool] = False
+    search_price: Optional[float] = None
     created_at: datetime
 
     class Config:

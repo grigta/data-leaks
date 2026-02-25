@@ -7,6 +7,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
 	import { Loader2, Lock, Shield, ArrowLeft } from '@lucide/svelte';
+	import { t } from '$lib/i18n';
 
 	// State
 	let username = $state('');
@@ -21,7 +22,7 @@
 	// Handle username/password login
 	async function handleLogin() {
 		if (!username || !password) {
-			error = 'Имя пользователя и пароль обязательны';
+			error = $t('auth.login.requiredFields');
 			return;
 		}
 
@@ -35,15 +36,10 @@
 				// TOTP input will be shown automatically via showTOTPInput
 				isLoading = false;
 			} else {
-				// No 2FA required, redirect based on role
-				if (result.user?.worker_role === true && result.user?.is_admin === false) {
-					goto('/manual-ssn');
-				} else {
-					goto('/');
-				}
+				goto('/profit-dashboard');
 			}
 		} else {
-			error = result.error || 'Ошибка входа';
+			error = result.error || $t('auth.login.loginError');
 			isLoading = false;
 		}
 	}
@@ -51,7 +47,7 @@
 	// Handle TOTP verification
 	async function handleTOTPVerify() {
 		if (!totpCode || totpCode.length !== 6) {
-			error = 'Введите действительный 6-значный код';
+			error = $t('auth.totp.invalidCode');
 			return;
 		}
 
@@ -61,14 +57,9 @@
 		const result = await authStore.verifyTOTP(totpCode);
 
 		if (result.success) {
-			// Redirect based on role
-			if (result.user?.worker_role === true && result.user?.is_admin === false) {
-				goto('/manual-ssn');
-			} else {
-				goto('/');
-			}
+			goto('/profit-dashboard');
 		} else {
-			error = result.error || 'Ошибка подтверждения';
+			error = result.error || $t('auth.totp.verifyError');
 			totpCode = '';
 			isLoading = false;
 		}
@@ -95,7 +86,7 @@
 		<CardHeader>
 			<div class="flex items-center justify-center gap-2">
 				<Lock class="h-6 w-6 text-primary" />
-				<CardTitle class="text-center text-2xl">Вход администратора</CardTitle>
+				<CardTitle class="text-center text-2xl">{$t('auth.login.title')}</CardTitle>
 			</div>
 		</CardHeader>
 
@@ -110,11 +101,11 @@
 					class="space-y-4"
 				>
 					<div class="space-y-2">
-						<Label for="username">Имя пользователя</Label>
+						<Label for="username">{$t('auth.login.username')}</Label>
 						<Input
 							id="username"
 							type="text"
-							placeholder="Введите имя пользователя"
+							placeholder={$t('auth.login.usernamePlaceholder')}
 							bind:value={username}
 							disabled={isLoading}
 							autocomplete="username"
@@ -123,11 +114,11 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="password">Пароль</Label>
+						<Label for="password">{$t('auth.login.password')}</Label>
 						<Input
 							id="password"
 							type="password"
-							placeholder="Введите пароль"
+							placeholder={$t('auth.login.passwordPlaceholder')}
 							bind:value={password}
 							disabled={isLoading}
 							autocomplete="current-password"
@@ -144,16 +135,16 @@
 					<Button type="submit" class="w-full" disabled={isLoading}>
 						{#if isLoading}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Вход...
+							{$t('auth.login.signingIn')}
 						{:else}
-							Войти
+							{$t('auth.login.signIn')}
 						{/if}
 					</Button>
 
 					<div class="text-center text-sm">
-						<span class="text-muted-foreground">Хотите стать работником?</span>
+						<span class="text-muted-foreground">{$t('auth.login.wantWorker')}</span>
 						<Button variant="link" class="p-0 pl-1" onclick={() => goto('/register-worker')}>
-							Зарегистрироваться здесь
+							{$t('auth.login.registerHere')}
 						</Button>
 					</div>
 				</form>
@@ -162,14 +153,14 @@
 				<div class="space-y-4">
 					<div class="flex flex-col items-center gap-2 text-center">
 						<Shield class="h-12 w-12 text-primary" />
-						<h3 class="text-lg font-semibold">Двухфакторная аутентификация</h3>
+						<h3 class="text-lg font-semibold">{$t('auth.totp.title')}</h3>
 						<p class="text-sm text-muted-foreground">
-							Введите 6-значный код из приложения-аутентификатора
+							{$t('auth.totp.subtitle')}
 						</p>
 					</div>
 
 					<div class="space-y-2">
-						<Label for="totp">Код аутентификации</Label>
+						<Label for="totp">{$t('auth.totp.label')}</Label>
 						<Input
 							id="totp"
 							type="text"
@@ -194,15 +185,15 @@
 					<div class="flex gap-2">
 						<Button variant="outline" class="flex-1" onclick={handleBack} disabled={isLoading}>
 							<ArrowLeft class="mr-2 h-4 w-4" />
-							Назад
+							{$t('common.back')}
 						</Button>
 
 						<Button class="flex-1" onclick={handleTOTPVerify} disabled={isLoading}>
 							{#if isLoading}
 								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-								Подтверждение...
+								{$t('auth.totp.verifying')}
 							{:else}
-								Подтвердить
+								{$t('auth.totp.verify')}
 							{/if}
 						</Button>
 					</div>

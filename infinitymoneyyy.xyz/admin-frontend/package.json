@@ -43,6 +43,7 @@
 		"mode-watcher": "^0.4.1",
 		"svelte-qrcode": "^1.0.1",
 		"svelte-sonner": "^1.0.5",
+		"sveltekit-i18n": "^2.4.2",
 		"tailwind-merge": "^2.6.0",
 		"tailwind-variants": "^0.2.1"
 	}

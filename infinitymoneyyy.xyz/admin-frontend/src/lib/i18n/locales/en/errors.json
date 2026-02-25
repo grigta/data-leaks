@@ -1,0 +1,31 @@
+{
+	"stats": {
+		"totalErrors": "Total Errors",
+		"today": "Today",
+		"byApi": "By API"
+	},
+	"filters": {
+		"all": "All",
+		"searchBug": "SearchBug",
+		"whitePages": "WhitePages"
+	},
+	"cleanup": "Cleanup (30d+)",
+	"cleanupSuccess": "Deleted {{count}} old records",
+	"noErrors": "No errors found",
+	"table": {
+		"date": "Date",
+		"api": "API",
+		"errorType": "Error Type",
+		"code": "Code",
+		"message": "Message"
+	},
+	"detail": {
+		"title": "Error Details",
+		"httpCode": "HTTP Code",
+		"method": "Method",
+		"errorType": "Error Type",
+		"date": "Date",
+		"errorMessage": "Error Message",
+		"requestParams": "Request Parameters"
+	}
+}

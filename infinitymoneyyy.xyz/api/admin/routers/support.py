@@ -4,10 +4,12 @@ Handles support thread and message management for admins.
 """
 
 import logging
+import os
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
+import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy import select, func, update, desc, and_, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,9 @@ from api.common.database import get_postgres_session
 from api.common.models_postgres import SupportThread, SupportMessage, MessageStatus, MessageType, User, SupportMessageType
 from api.admin.dependencies import get_current_admin_user
 from api.admin.websocket import ws_manager
-from api.public.websocket import public_ws_manager
+
+# Public API internal URL for cross-service notifications (admin → user)
+PUBLIC_API_INTERNAL_URL = os.getenv("PUBLIC_API_INTERNAL_URL", "http://public_api:8000")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -499,7 +503,19 @@ async def reply_to_thread(
             "created_at": new_message.created_at.isoformat()
         }
         await ws_manager.broadcast_thread_message_added(message_data)
-        await public_ws_manager.send_to_user(str(thread.user_id), "thread_message_added", message_data)
+
+        # Notify user via public_api WebSocket (cross-container HTTP call)
+        try:
+            async with aiohttp.ClientSession() as http_session:
+                async with http_session.post(
+                    f"{PUBLIC_API_INTERNAL_URL}/internal/notify-thread-message",
+                    json={"user_id": str(thread.user_id), "message_data": message_data},
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Failed to notify public_api about thread message: HTTP {resp.status}")
+        except Exception as notify_error:
+            logger.error(f"Error notifying public_api about thread message: {notify_error}")
 
         return MessageResponse.from_message(new_message, responded_by_username=current_user.username)
 
@@ -571,7 +587,19 @@ async def update_thread_status(
             "updated_at": datetime.utcnow().isoformat()
         }
         await ws_manager.broadcast_thread_status_updated(status_data)
-        await public_ws_manager.send_to_user(str(thread.user_id), "thread_status_updated", status_data)
+
+        # Notify user via public_api WebSocket (cross-container HTTP call)
+        try:
+            async with aiohttp.ClientSession() as http_session:
+                async with http_session.post(
+                    f"{PUBLIC_API_INTERNAL_URL}/internal/notify-thread-status",
+                    json={"user_id": str(thread.user_id), "status_data": status_data},
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Failed to notify public_api about thread status: HTTP {resp.status}")
+        except Exception as notify_error:
+            logger.error(f"Error notifying public_api about thread status: {notify_error}")
 
         # Count unread user messages
         unread_query = select(func.count()).where(

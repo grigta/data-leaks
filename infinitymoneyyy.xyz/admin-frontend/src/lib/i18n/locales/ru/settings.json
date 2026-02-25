@@ -1,0 +1,14 @@
+{
+	"title": "Настройки",
+	"searchFlow": {
+		"title": "Поток поиска",
+		"updated": "Обновлено: {{date}}",
+		"label": "Активный поток поиска",
+		"placeholder": "Выберите поток",
+		"allFlows": "Все доступные потоки",
+		"active": "Активный",
+		"selected": "Выбран",
+		"changingFrom": "Изменение с <strong>{{from}}</strong> на <strong>{{to}}</strong>",
+		"saved": "Поток поиска обновлён"
+	}
+}

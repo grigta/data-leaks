@@ -7,7 +7,7 @@ import type { PageLoad } from './$types';
 export const load: PageLoad = async () => {
 	// Redirect to dashboard if already authenticated
 	if (browser && get(isAuthenticated)) {
-		throw redirect(302, '/dashboard');
+		throw redirect(302, '/profit-dashboard');
 	}
 
 	return {};

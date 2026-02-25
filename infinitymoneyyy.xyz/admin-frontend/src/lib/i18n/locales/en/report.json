@@ -1,0 +1,25 @@
+{
+	"title": "Threads",
+	"total": "{{count}} total",
+	"noThreads": "No threads found",
+	"filters": {
+		"all": "All",
+		"pending": "Pending",
+		"answered": "Answered",
+		"closed": "Closed"
+	},
+	"table": {
+		"user": "User",
+		"subject": "Subject",
+		"status": "Status",
+		"unread": "Unread",
+		"lastMessage": "Last Message"
+	},
+	"noSubject": "No subject",
+	"from": "From: {{username}}",
+	"noMessages": "No messages",
+	"replyPlaceholder": "Type your reply...",
+	"replySent": "Reply sent",
+	"threadClosed": "Thread closed",
+	"viewThread": "View thread"
+}

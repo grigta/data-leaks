@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { user, refreshUser } from '$lib/stores/auth';
 	import { createDeposit, getTransactions, type TransactionResponse } from '$lib/api/client';
 	import { formatCurrency, formatDate } from '$lib/utils';
@@ -31,6 +30,8 @@
 	import Receipt from '@lucide/svelte/icons/receipt';
 	import Copy from '@lucide/svelte/icons/copy';
 	import QrCode from '@lucide/svelte/icons/qr-code';
+	import TrendingUp from '@lucide/svelte/icons/trending-up';
+	import Hash from '@lucide/svelte/icons/hash';
 
 	// State
 	let amount = $state('20');
@@ -176,7 +177,7 @@
 	}
 </script>
 
-<div class="container mx-auto max-w-7xl space-y-6 p-6">
+<div class="container mx-auto max-w-5xl space-y-6 p-6">
 	<!-- Page Title -->
 	<div class="flex items-center justify-between">
 		<h1 class="text-3xl font-bold">{$t('balance.title')}</h1>
@@ -198,96 +199,110 @@
 		</Alert>
 	{/if}
 
-	<!-- Main Content - Two Columns -->
-	<div class="flex flex-col gap-6 lg:flex-row lg:items-stretch">
-		<!-- Left Column - Add Funds -->
-		<div class="w-full shrink-0 lg:w-96">
-			<Card class="border h-full flex flex-col">
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Wallet class="h-5 w-5" />
-						{$t('balance.addFunds')}
-					</CardTitle>
-				</CardHeader>
-				<CardContent class="space-y-4 flex-1">
-					<!-- Current Balance Display -->
-					<div class="rounded-lg bg-muted/50 p-4">
-						<p class="text-sm text-muted-foreground">{$t('balance.currentBalance')}</p>
-						<p class="text-2xl font-bold">{formatCurrency($user?.balance || 0)}</p>
-					</div>
+	<!-- Stats Bar -->
+	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+		<!-- Balance Card -->
+		<Card class="border overflow-hidden">
+			<div class="h-1 bg-foreground"></div>
+			<CardContent class="pt-4 pb-4">
+				<div class="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+					<Wallet class="h-4 w-4" />
+					{$t('balance.currentBalance')}
+				</div>
+				<p class="text-3xl font-bold tabular-nums">{formatCurrency($user?.balance || 0)}</p>
+			</CardContent>
+		</Card>
 
-					<!-- Total Deposits Display -->
-					<div class="rounded-lg bg-muted/30 p-3">
-						<p class="text-xs text-muted-foreground">{$t('balance.totalDeposits')}</p>
-						<p class="text-lg font-semibold text-muted-foreground">{formatCurrency(totalTopUp)}</p>
-					</div>
-				</CardContent>
-				<CardFooter>
-					<Button
-						class="w-full bg-white hover:bg-gray-100 text-black dark:bg-white dark:hover:bg-gray-200 dark:text-black"
-						onclick={() => goto('/crypto-deposit')}
-					>
-						<Wallet class="mr-2 h-4 w-4" />
-						{$t('balance.addFunds')}
-					</Button>
-				</CardFooter>
-			</Card>
-		</div>
+		<!-- Total Deposits Card -->
+		<Card class="border overflow-hidden">
+			<div class="h-1 bg-foreground"></div>
+			<CardContent class="pt-4 pb-4">
+				<div class="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+					<TrendingUp class="h-4 w-4" />
+					{$t('balance.totalDeposits')}
+				</div>
+				<p class="text-3xl font-bold tabular-nums">{formatCurrency(totalTopUp)}</p>
+			</CardContent>
+		</Card>
 
-		<!-- Right Column - Invoices -->
-		<div class="flex-1">
-			<Card class="border">
-				<CardHeader>
-					<CardTitle class="flex items-center gap-2">
-						<Receipt class="h-5 w-5" />
-						{$t('balance.transactionHistory')}
-					</CardTitle>
-				</CardHeader>
-				<CardContent class="p-0">
-					{#if isLoading}
-						<div class="space-y-2 p-6">
-							{#each Array(5) as _}
-								<Skeleton class="h-12 w-full" />
-							{/each}
-						</div>
-					{:else if transactions.length === 0}
-						<div class="flex flex-col items-center justify-center py-12">
-							<Receipt class="mb-4 h-16 w-16 text-gray-400" />
-							<h2 class="mb-2 text-xl font-semibold">{$t('balance.noTransactions')}</h2>
-							<p class="text-gray-500">{$t('balance.noTransactions')}</p>
-						</div>
-					{:else}
-						<div class="overflow-x-auto">
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{$t('balance.table.date')}</TableHead>
-										<TableHead class="text-right">{$t('balance.table.amount')}</TableHead>
-										<TableHead>{$t('balance.table.status')}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{#each transactions as transaction (transaction.id)}
-										<TableRow>
-											<TableCell class="text-sm">
-												{formatDate(transaction.created_at)}
-											</TableCell>
-											<TableCell class="text-right font-semibold">
-												{formatCurrency(transaction.amount)}
-											</TableCell>
-											<TableCell>
-												<Badge class={getStatusBadgeClass(transaction.status)}>
-													{getStatusLabel(transaction.status)}
-												</Badge>
-											</TableCell>
-										</TableRow>
-									{/each}
-								</TableBody>
-							</Table>
-						</div>
-					{/if}
-				</CardContent>
-			</Card>
-		</div>
+		<!-- Transaction Count Card -->
+		<Card class="border overflow-hidden">
+			<div class="h-1 bg-foreground"></div>
+			<CardContent class="pt-4 pb-4">
+				<div class="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+					<Hash class="h-4 w-4" />
+					{$t('balance.transactionCount')}
+				</div>
+				<p class="text-3xl font-bold tabular-nums">{transactions.length}</p>
+			</CardContent>
+		</Card>
 	</div>
+
+	<!-- Add Funds Button -->
+	<Button
+		class="w-full bg-white hover:bg-gray-100 text-black border border-black/20 dark:bg-white dark:hover:bg-gray-200 dark:text-black dark:border-transparent"
+		size="lg"
+		onclick={handlePay}
+		disabled={isProcessing}
+	>
+		{#if isProcessing}
+			<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+		{:else}
+			<Wallet class="mr-2 h-4 w-4" />
+		{/if}
+		{$t('balance.addFunds')}
+	</Button>
+
+	<!-- Transaction History -->
+	<Card class="border">
+		<CardHeader>
+			<CardTitle class="flex items-center gap-2">
+				<Receipt class="h-5 w-5" />
+				{$t('balance.transactionHistory')}
+			</CardTitle>
+		</CardHeader>
+		<CardContent class="p-0">
+			{#if isLoading}
+				<div class="space-y-2 p-6">
+					{#each Array(5) as _}
+						<Skeleton class="h-12 w-full" />
+					{/each}
+				</div>
+			{:else if transactions.length === 0}
+				<div class="flex flex-col items-center justify-center py-12">
+					<Receipt class="mb-4 h-16 w-16 text-muted-foreground/30" />
+					<h2 class="mb-2 text-xl font-semibold">{$t('balance.noTransactions')}</h2>
+				</div>
+			{:else}
+				<div class="overflow-x-auto">
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>{$t('balance.table.date')}</TableHead>
+								<TableHead class="text-right">{$t('balance.table.amount')}</TableHead>
+								<TableHead>{$t('balance.table.status')}</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{#each transactions as transaction (transaction.id)}
+								<TableRow>
+									<TableCell class="text-sm">
+										{formatDate(transaction.created_at)}
+									</TableCell>
+									<TableCell class="text-right font-semibold">
+										{formatCurrency(transaction.amount)}
+									</TableCell>
+									<TableCell>
+										<Badge class={getStatusBadgeClass(transaction.status)}>
+											{getStatusLabel(transaction.status)}
+										</Badge>
+									</TableCell>
+								</TableRow>
+							{/each}
+						</TableBody>
+					</Table>
+				</div>
+			{/if}
+		</CardContent>
+	</Card>
 </div>

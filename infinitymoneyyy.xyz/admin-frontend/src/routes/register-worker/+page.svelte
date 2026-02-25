@@ -8,6 +8,7 @@
 	import { Alert, AlertDescription } from '$lib/components/ui/alert';
 	import { Loader2, UserPlus, CheckCircle, Copy, ArrowRight } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
+	import { t } from '$lib/i18n';
 
 	// State
 	let username = $state('');
@@ -22,23 +23,23 @@
 	// Validation
 	function validate(): string | null {
 		if (!username || !email || !password || !confirmPassword) {
-			return 'Все поля обязательны';
+			return $t('auth.register.allFieldsRequired');
 		}
 
 		if (username.length < 3 || username.length > 50) {
-			return 'Имя пользователя должно быть от 3 до 50 символов';
+			return $t('auth.register.usernameLength');
 		}
 
 		if (!email.includes('@')) {
-			return 'Введите действительный адрес email';
+			return $t('auth.register.invalidEmail');
 		}
 
 		if (password.length < 8) {
-			return 'Пароль должен быть не менее 8 символов';
+			return $t('auth.register.passwordLength');
 		}
 
 		if (password !== confirmPassword) {
-			return 'Пароли не совпадают';
+			return $t('auth.register.passwordMismatch');
 		}
 
 		return null;
@@ -67,12 +68,12 @@
 			// Registration successful
 			accessCode = response.access_code;
 			registrationComplete = true;
-			toast.success('Регистрация успешна!');
+			toast.success($t('auth.register.registrationSuccess'));
 		} catch (err: any) {
 			if (err.response?.data?.detail) {
 				error = err.response.data.detail;
 			} else {
-				error = err.message || 'Регистрация не удалась. Попробуйте снова.';
+				error = err.message || $t('auth.register.registrationFailed');
 			}
 		} finally {
 			isLoading = false;
@@ -85,9 +86,9 @@
 
 		try {
 			await navigator.clipboard.writeText(accessCode);
-			toast.success('Код доступа скопирован в буфер обмена!');
+			toast.success($t('auth.register.accessCodeCopied'));
 		} catch (err) {
-			toast.error('Не удалось скопировать код доступа');
+			toast.error($t('auth.register.accessCodeCopyFailed'));
 		}
 	}
 
@@ -104,11 +105,11 @@
 		<CardHeader>
 			<div class="flex items-center justify-center gap-2">
 				<UserPlus class="h-6 w-6 text-primary" />
-				<CardTitle class="text-center text-2xl">Регистрация работника</CardTitle>
+				<CardTitle class="text-center text-2xl">{$t('auth.register.title')}</CardTitle>
 			</div>
 			{#if !registrationComplete}
 				<CardDescription class="text-center">
-					Зарегистрируйтесь, чтобы стать работником. После регистрации ваша заявка будет рассмотрена администратором.
+					{$t('auth.register.description')}
 				</CardDescription>
 			{/if}
 		</CardHeader>
@@ -124,25 +125,25 @@
 					class="space-y-4"
 				>
 					<div class="space-y-2">
-						<Label for="username">Имя пользователя *</Label>
+						<Label for="username">{$t('auth.register.username')}</Label>
 						<Input
 							id="username"
 							type="text"
-							placeholder="Выберите имя пользователя"
+							placeholder={$t('auth.register.usernamePlaceholder')}
 							bind:value={username}
 							disabled={isLoading}
 							autocomplete="username"
 							onkeypress={(e) => handleKeyPress(e, handleRegister)}
 						/>
-						<p class="text-xs text-muted-foreground">3-50 символов</p>
+						<p class="text-xs text-muted-foreground">{$t('auth.register.usernameHint')}</p>
 					</div>
 
 					<div class="space-y-2">
-						<Label for="email">Email *</Label>
+						<Label for="email">{$t('auth.register.email')}</Label>
 						<Input
 							id="email"
 							type="email"
-							placeholder="ваш@email.com"
+							placeholder={$t('auth.register.emailPlaceholder')}
 							bind:value={email}
 							disabled={isLoading}
 							autocomplete="email"
@@ -151,25 +152,25 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="password">Пароль *</Label>
+						<Label for="password">{$t('auth.register.password')}</Label>
 						<Input
 							id="password"
 							type="password"
-							placeholder="Введите пароль"
+							placeholder={$t('auth.register.passwordPlaceholder')}
 							bind:value={password}
 							disabled={isLoading}
 							autocomplete="new-password"
 							onkeypress={(e) => handleKeyPress(e, handleRegister)}
 						/>
-						<p class="text-xs text-muted-foreground">Минимум 8 символов</p>
+						<p class="text-xs text-muted-foreground">{$t('auth.register.passwordHint')}</p>
 					</div>
 
 					<div class="space-y-2">
-						<Label for="confirm-password">Подтвердите пароль *</Label>
+						<Label for="confirm-password">{$t('auth.register.confirmPassword')}</Label>
 						<Input
 							id="confirm-password"
 							type="password"
-							placeholder="Подтвердите пароль"
+							placeholder={$t('auth.register.confirmPasswordPlaceholder')}
 							bind:value={confirmPassword}
 							disabled={isLoading}
 							autocomplete="new-password"
@@ -186,17 +187,17 @@
 					<Button type="submit" class="w-full" disabled={isLoading}>
 						{#if isLoading}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Регистрация...
+							{$t('auth.register.registering')}
 						{:else}
 							<UserPlus class="mr-2 h-4 w-4" />
-							Зарегистрироваться как работник
+							{$t('auth.register.registerButton')}
 						{/if}
 					</Button>
 
 					<div class="text-center text-sm">
-						<span class="text-muted-foreground">Уже зарегистрированы?</span>
+						<span class="text-muted-foreground">{$t('auth.register.alreadyRegistered')}</span>
 						<Button variant="link" class="p-0 pl-1" onclick={() => goto('/login')}>
-							Войти здесь
+							{$t('auth.register.loginHere')}
 						</Button>
 					</div>
 				</form>
@@ -206,16 +207,16 @@
 					<div class="flex flex-col items-center gap-4 text-center">
 						<CheckCircle class="h-16 w-16 text-green-600" />
 						<div>
-							<h3 class="text-lg font-semibold">Регистрация успешна!</h3>
+							<h3 class="text-lg font-semibold">{$t('auth.register.successTitle')}</h3>
 							<p class="text-sm text-muted-foreground">
-								Ваша заявка на регистрацию работника отправлена.
+								{$t('auth.register.successMessage')}
 							</p>
 						</div>
 					</div>
 
 					<div class="space-y-3 rounded-lg border p-4">
 						<div class="flex items-center justify-between">
-							<Label class="text-sm font-medium">Ваш код доступа</Label>
+							<Label class="text-sm font-medium">{$t('auth.register.accessCodeLabel')}</Label>
 							<Button variant="ghost" size="sm" onclick={copyAccessCode}>
 								<Copy class="h-4 w-4" />
 							</Button>
@@ -225,22 +226,22 @@
 						</div>
 						<Alert>
 							<AlertDescription class="text-xs">
-								<strong>Важно:</strong> Сохраните этот код доступа! Он понадобится вам для доступа к функциям работника после одобрения вашей заявки администратором.
+								<strong>{$t('auth.register.important')}</strong> {$t('auth.register.accessCodeWarning')}
 							</AlertDescription>
 						</Alert>
 					</div>
 
 					<div class="space-y-2 text-sm text-muted-foreground">
-						<p><strong>Следующие шаги:</strong></p>
+						<p><strong>{$t('auth.register.nextSteps')}</strong></p>
 						<ol class="list-decimal list-inside space-y-1 ml-2">
-							<li>Сохраните код доступа в безопасном месте</li>
-							<li>Дождитесь рассмотрения заявки администратором</li>
-							<li>Сможете войти после одобрения</li>
+							<li>{$t('auth.register.step1')}</li>
+							<li>{$t('auth.register.step2')}</li>
+							<li>{$t('auth.register.step3')}</li>
 						</ol>
 					</div>
 
 					<Button class="w-full" onclick={() => goto('/login')}>
-						Перейти ко входу
+						{$t('auth.register.goToLogin')}
 						<ArrowRight class="ml-2 h-4 w-4" />
 					</Button>
 				</div>

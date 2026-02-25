@@ -19,6 +19,9 @@ export const SUPPORT_MESSAGE_ANSWERED = 'support_message_answered';
 export const CONTACT_MESSAGE_CREATED = 'contact_message_created';
 export const CONTACT_MESSAGE_ANSWERED = 'contact_message_answered';
 
+// Balance events
+export const BALANCE_UPDATED = 'balance_updated';
+
 // Thread-based Support event constants
 export const THREAD_CREATED = 'thread_created';
 export const THREAD_MESSAGE_ADDED = 'thread_message_added';
