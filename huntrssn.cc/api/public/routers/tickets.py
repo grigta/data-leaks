@@ -22,6 +22,7 @@ from api.public.dependencies import get_current_user
 
 # Configuration for internal API calls
 ADMIN_API_INTERNAL_URL = os.getenv("ADMIN_API_INTERNAL_URL", "http://admin_api:8002")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -223,12 +224,15 @@ async def create_ticket(
                 async with session.post(
                     f"{ADMIN_API_INTERNAL_URL}/internal/notify-ticket-created",
                     json={"ticket_data": notify_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Admin API: HTTP {response.status}")
                     else:
                         logger.info(f"Successfully notified Admin API about ticket {new_ticket.id}")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying Admin API about ticket creation: {notify_error}")
 
@@ -237,6 +241,8 @@ async def create_ticket(
     except HTTPException:
         # Re-raise HTTP exceptions
         await db.rollback()
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating ticket: {e}", exc_info=True)
@@ -252,6 +258,8 @@ async def create_ticket(
             await db.execute(refund_stmt)
             await db.commit()
             logger.info(f"Refunded ${manual_ssn_price} to user {current_user.id} after ticket creation failure")
+        except HTTPException:
+            raise
         except Exception as refund_error:
             logger.critical(
                 f"CRITICAL: Failed to refund ${manual_ssn_price} to user {current_user.id}: {refund_error}",
@@ -322,6 +330,8 @@ async def get_my_tickets(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting user tickets: {e}")
         raise HTTPException(
@@ -351,6 +361,8 @@ async def get_unviewed_tickets_count(
 
         logger.info(f"[UNVIEWED-COUNT] User {current_user.username} has {count} unviewed tickets")
         return {"count": int(count)}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting unviewed tickets count: {e}")
         raise HTTPException(
@@ -401,6 +413,8 @@ async def mark_tickets_as_viewed(
         logger.info(f"Marked {updated_count} tickets as viewed for user {current_user.username}")
 
         return {"success": True, "updated_count": updated_count}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error marking tickets as viewed: {e}")
         await db.rollback()
@@ -449,6 +463,8 @@ async def get_ticket_details(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -578,6 +594,8 @@ async def move_ticket_to_order(
 
     except HTTPException:
         await db.rollback()
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error moving ticket {ticket_id} to order: {e}", exc_info=True)

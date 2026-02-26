@@ -1,9 +1,33 @@
 """
-API Key authentication utilities for Enrichment API.
+API Key authentication utilities for Enrichment API and internal service communication.
 """
 import os
 import secrets
 from fastapi import Header, HTTPException, status
+
+
+# Internal API key for inter-service communication
+INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', '')
+
+
+async def verify_internal_api_key(
+    x_internal_api_key: str = Header(..., alias="X-Internal-Api-Key")
+) -> str:
+    """
+    FastAPI dependency for internal API key authentication.
+    Used to protect /internal/* endpoints from unauthorized access.
+    """
+    if not INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="INTERNAL_API_KEY not configured"
+        )
+    if not secrets.compare_digest(x_internal_api_key, INTERNAL_API_KEY):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal API key"
+        )
+    return x_internal_api_key
 
 
 def get_valid_api_keys() -> set:

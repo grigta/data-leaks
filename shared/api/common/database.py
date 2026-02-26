@@ -8,7 +8,14 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from database.db_schema import get_connection, close_connection, DEFAULT_DB_PATH
 
 # PostgreSQL configuration
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://ssn_user:password@localhost:5432/ssn_users')
+_database_url_raw = os.getenv('DATABASE_URL', '')
+_DATABASE_URL_DEFAULT = 'postgresql+asyncpg://ssn_user:password@localhost:5432/ssn_users'
+if not _database_url_raw or _database_url_raw == _DATABASE_URL_DEFAULT:
+    raise ValueError(
+        "DATABASE_URL environment variable must be set. "
+        "Do not use the default placeholder with hardcoded credentials."
+    )
+DATABASE_URL = _database_url_raw
 
 # SQLite configuration
 SQLITE_PATH = os.getenv('SQLITE_PATH', DEFAULT_DB_PATH)

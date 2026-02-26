@@ -22,6 +22,7 @@ from api.admin.dependencies import get_current_admin_user
 from api.admin.websocket import ws_manager
 
 WORKER_API_URL = os.getenv("WORKER_API_URL", "http://worker_api:8003")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/worker-requests", tags=["Worker Requests"])
@@ -80,9 +81,14 @@ async def list_workers(
     online_worker_ids = []
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{WORKER_API_URL}/internal/online-workers")
+            resp = await client.get(
+                f"{WORKER_API_URL}/internal/online-workers",
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
+            )
             if resp.status_code == 200:
                 online_worker_ids = resp.json().get("online_worker_ids", [])
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to fetch online workers from worker_api: {e}")
 
@@ -234,9 +240,14 @@ async def get_distribution_config(
     online_worker_ids = []
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{WORKER_API_URL}/internal/online-workers")
+            resp = await client.get(
+                f"{WORKER_API_URL}/internal/online-workers",
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
+            )
             if resp.status_code == 200:
                 online_worker_ids = resp.json().get("online_worker_ids", [])
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to fetch online workers: {e}")
 
@@ -341,8 +352,11 @@ async def _notify_worker_shift(worker_id: str, shift_data: dict):
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.post(
                 f"{WORKER_API_URL}/internal/notify-shift-from-admin",
-                json={"worker_id": worker_id, "shift_data": shift_data}
+                json={"worker_id": worker_id, "shift_data": shift_data},
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
             )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to notify worker about shift update: {e}")
 
@@ -860,6 +874,8 @@ async def list_worker_requests(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing worker requests: {e}")
         raise HTTPException(
@@ -976,6 +992,8 @@ async def approve_worker_request(
                 "status": "approved"
             }
             await ws_manager.broadcast_worker_request_approved(request_data, str(new_user.id))
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to broadcast worker approval: {e}")
 
@@ -988,6 +1006,8 @@ async def approve_worker_request(
             access_code=new_user.access_code
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -1052,6 +1072,8 @@ async def reject_worker_request(
                 "status": "rejected"
             }
             await ws_manager.broadcast_to_admins("worker_request_rejected", request_data)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to broadcast worker rejection: {e}")
 
@@ -1062,6 +1084,8 @@ async def reject_worker_request(
             username=registration_request.username
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

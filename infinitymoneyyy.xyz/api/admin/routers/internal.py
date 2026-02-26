@@ -7,16 +7,17 @@ These endpoints are only accessible within the Docker network.
 import logging
 from typing import Dict
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from api.common.security import verify_internal_api_key
 from api.admin.websocket import ws_manager
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 # Router instance
-router = APIRouter(prefix="/internal", tags=["Internal"])
+router = APIRouter(prefix="/internal", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
 
 
 class NotifyTicketRequest(BaseModel):
@@ -62,6 +63,8 @@ async def notify_ticket_created(
         logger.info(f"Broadcasted ticket_created to admins for ticket {ticket_id}")
         return {"status": "success", "message": "Notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting ticket_created: {e}", exc_info=True)
         raise HTTPException(
@@ -85,6 +88,8 @@ async def notify_ticket_updated(
         logger.info(f"Broadcasted ticket_updated to admins for ticket {ticket_id} (status={ticket_status})")
         return {"status": "success", "message": "Notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting ticket_updated: {e}", exc_info=True)
         raise HTTPException(
@@ -106,6 +111,8 @@ async def notify_thread_created(
         logger.info(f"Broadcasted thread_created to admins for thread {thread_id}")
         return {"status": "success", "message": "Thread notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting thread_created: {e}", exc_info=True)
         raise HTTPException(
@@ -127,6 +134,8 @@ async def notify_thread_message(
         logger.info(f"Broadcasted thread_message_added to admins for thread {thread_id}")
         return {"status": "success", "message": "Thread message notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting thread_message_added: {e}", exc_info=True)
         raise HTTPException(
@@ -148,6 +157,8 @@ async def notify_invoice_created(
         logger.info(f"Broadcasted worker_invoice_created to admins for invoice {invoice_id}")
         return {"status": "success", "message": "Invoice notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting worker_invoice_created: {e}", exc_info=True)
         raise HTTPException(
@@ -170,6 +181,8 @@ async def notify_schedule_updated(
         logger.info(f"Broadcasted worker_schedule_updated to admins for worker {worker_id}")
         return {"status": "success", "message": "Schedule notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting worker_schedule_updated: {e}", exc_info=True)
         raise HTTPException(
@@ -192,6 +205,8 @@ async def notify_shift_updated(
         logger.info(f"Broadcasted worker_shift_updated to admins for worker {worker_id}")
         return {"status": "success", "message": "Shift notification broadcasted to admins"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting worker_shift_updated: {e}", exc_info=True)
         raise HTTPException(

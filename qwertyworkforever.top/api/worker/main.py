@@ -5,10 +5,13 @@ Provides worker authentication and ticket management for qwertyworkforever.top.
 import os
 from typing import Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.worker.routers.auth import router as auth_router
+from api.common.security import verify_internal_api_key
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from api.worker.routers.auth import router as auth_router, worker_limiter
 from api.worker.routers.tickets import router as tickets_router
 from api.worker.routers.wallet import router as wallet_router
 from api.worker.routers.shift import router as shift_router
@@ -51,9 +54,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Internal-Api-Key"],
 )
+
+# Rate limiting
+app.state.limiter = worker_limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Include routers
 app.include_router(auth_router, prefix="/auth")
@@ -73,20 +80,23 @@ async def health_check():
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(None)):
-    """WebSocket for real-time worker notifications. Supports optional JWT auth for online tracking."""
-    user_id = None
-
-    # Try to authenticate if token provided
-    if token:
-        try:
-            payload = decode_access_token(token)
-            user_id = payload.get("user_id")
-            if user_id:
-                logger.info(f"Worker WS authenticated: user_id={user_id}")
-        except Exception as e:
-            logger.warning(f"Worker WS auth failed: {e}")
-            # Still allow connection, just without tracking
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
+    """WebSocket for real-time worker notifications. Requires JWT auth."""
+    # Authenticate — token is mandatory
+    try:
+        payload = decode_access_token(token)
+        user_id = payload.get("user_id")
+        if not user_id:
+            await websocket.close(code=1008, reason="Invalid token payload")
+            return
+        logger.info(f"Worker WS authenticated: user_id={user_id}")
+    except HTTPException:
+        await websocket.close(code=1008, reason="Invalid or expired token")
+        return
+    except Exception as e:
+        logger.warning(f"Worker WS auth failed: {e}")
+        await websocket.close(code=1008, reason="Authentication failed")
+        return
 
     await ws_manager.connect(websocket, user_id=user_id)
     try:
@@ -99,14 +109,14 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(
         ws_manager.disconnect(websocket, user_id=user_id)
 
 
-@app.post("/internal/notify-new-ticket", tags=["Internal"])
+@app.post("/internal/notify-new-ticket", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
 async def notify_new_ticket():
     """Called by public_api when a new ManualSSNTicket is created."""
     await ws_manager.broadcast("NEW_TICKET")
     return {"status": "ok"}
 
 
-@app.post("/internal/notify-shift-from-admin", tags=["Internal"])
+@app.post("/internal/notify-shift-from-admin", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
 async def notify_shift_from_admin(request: Request):
     """Called by admin_api when admin force-stops a worker's shift."""
     data = await request.json()
@@ -117,7 +127,7 @@ async def notify_shift_from_admin(request: Request):
     return {"status": "ok"}
 
 
-@app.get("/internal/online-workers", tags=["Internal"])
+@app.get("/internal/online-workers", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
 async def get_online_workers():
     """Return list of online worker user IDs. Called by admin_api."""
     return {"online_worker_ids": ws_manager.get_online_worker_ids()}

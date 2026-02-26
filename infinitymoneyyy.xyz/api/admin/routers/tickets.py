@@ -27,6 +27,7 @@ from decimal import Decimal
 # Configuration for internal API calls
 PUBLIC_API_INTERNAL_URL = os.getenv("PUBLIC_API_INTERNAL_URL", "http://public_api:8000")
 WORKER_API_URL = os.getenv("WORKER_API_URL", "http://worker_api:8003")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -122,9 +123,14 @@ async def create_ticket(
         online_worker_ids = []
         try:
             async with httpx.AsyncClient(timeout=5.0) as http_client:
-                resp = await http_client.get(f"{WORKER_API_URL}/internal/online-workers")
+                resp = await http_client.get(
+                    f"{WORKER_API_URL}/internal/online-workers",
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
+                )
                 if resp.status_code == 200:
                     online_worker_ids = resp.json().get("online_worker_ids", [])
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to fetch online workers: {e}")
         assigned_worker = None
@@ -257,6 +263,8 @@ async def create_ticket(
         # Broadcast to admins
         try:
             await ws_manager.broadcast_ticket_created(ticket_data)
+        except HTTPException:
+            raise
         except Exception as ws_error:
             logger.error(f"WebSocket broadcast failed: {ws_error}")
 
@@ -264,6 +272,8 @@ async def create_ticket(
         if assigned_worker:
             try:
                 await ws_manager.broadcast_to_worker(assigned_worker, "ticket_created", ticket_data)
+            except HTTPException:
+                raise
             except Exception as ws_error:
                 logger.error(f"WebSocket worker notification failed: {ws_error}")
 
@@ -273,11 +283,14 @@ async def create_ticket(
                 async with session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/notify-ticket-created",
                     json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Public API: HTTP {response.status}")
                     else:
                         logger.info(f"Successfully notified Public API about ticket creation")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying Public API: {notify_error}", exc_info=True)
 
@@ -285,6 +298,8 @@ async def create_ticket(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating ticket: {e}")
@@ -316,6 +331,8 @@ async def get_pending_tickets_count(
 
         return {"count": count}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting pending tickets count: {e}")
         raise HTTPException(
@@ -383,6 +400,8 @@ async def list_tickets(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing tickets: {e}")
         raise HTTPException(
@@ -439,6 +458,8 @@ async def get_unassigned_tickets(
             per_page=limit
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting unassigned tickets: {e}")
         raise HTTPException(
@@ -477,6 +498,8 @@ async def get_ticket(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -606,6 +629,8 @@ async def update_ticket(
         # Broadcast update
         try:
             await ws_manager.broadcast_ticket_updated(ticket_data)
+        except HTTPException:
+            raise
         except Exception as ws_error:
             logger.error(f"WebSocket broadcast failed: {ws_error}")
 
@@ -618,11 +643,14 @@ async def update_ticket(
                 async with session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/{endpoint}",
                     json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Public API: HTTP {response.status}")
                     else:
                         logger.info(f"Successfully notified Public API about ticket update (endpoint: {endpoint})")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying Public API: {notify_error}", exc_info=True)
 
@@ -630,6 +658,8 @@ async def update_ticket(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -731,6 +761,8 @@ async def assign_ticket(
         # Broadcast assignment
         try:
             await ws_manager.broadcast_ticket_updated(ticket_data)
+        except HTTPException:
+            raise
         except Exception as ws_error:
             logger.error(f"WebSocket broadcast failed: {ws_error}")
 
@@ -740,11 +772,14 @@ async def assign_ticket(
                 async with session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/notify-ticket-updated",
                     json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                 ) as response:
                     if response.status != 200:
                         logger.error(f"Failed to notify Public API: HTTP {response.status}")
                     else:
                         logger.info(f"Successfully notified Public API about ticket assignment")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying Public API: {notify_error}", exc_info=True)
 
@@ -752,6 +787,8 @@ async def assign_ticket(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -884,6 +921,8 @@ async def move_ticket_to_order(
     except HTTPException:
         await db.rollback()
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error moving ticket {ticket_id} to order: {e}", exc_info=True)
         await db.rollback()
@@ -967,6 +1006,8 @@ async def claim_ticket(
                 "updated_at": ticket.updated_at.isoformat()
             }
             await ws_manager.broadcast_ticket_updated(ticket_data)
+        except HTTPException:
+            raise
         except Exception as ws_error:
             logger.error(f"WebSocket broadcast failed: {ws_error}")
 
@@ -986,6 +1027,8 @@ async def claim_ticket(
 
     except HTTPException:
         await db.rollback()
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error claiming ticket {ticket_id}: {e}")

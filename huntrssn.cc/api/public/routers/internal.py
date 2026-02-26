@@ -7,16 +7,17 @@ These endpoints are only accessible within the Docker network.
 import logging
 from typing import Dict
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from api.common.security import verify_internal_api_key
 from api.public.websocket import public_ws_manager, publish_user_notification, WebSocketEventType
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 # Router instance
-router = APIRouter(prefix="/internal", tags=["Internal"])
+router = APIRouter(prefix="/internal", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
 
 
 class NotifyTicketRequest(BaseModel):
@@ -59,6 +60,8 @@ async def notify_ticket_created(
         logger.info(f"Broadcasted ticket_created for user {request.user_id} to bots")
         return {"status": "success", "message": "Notification sent to bots"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting ticket_created: {e}", exc_info=True)
         raise HTTPException(
@@ -83,6 +86,8 @@ async def notify_ticket_updated(
         logger.info(f"Broadcasted ticket_updated for user {request.user_id} to bots")
         return {"status": "success", "message": "Notification sent to bots"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting ticket_updated: {e}", exc_info=True)
         raise HTTPException(
@@ -107,6 +112,8 @@ async def notify_ticket_completed(
         logger.info(f"Broadcasted ticket_completed for user {request.user_id} to bots")
         return {"status": "success", "message": "Notification sent to bots"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error broadcasting ticket_completed: {e}", exc_info=True)
         raise HTTPException(
@@ -133,6 +140,8 @@ async def notify_thread_message(
         logger.info(f"Published thread_message_added for user {request.user_id}")
         return {"status": "success", "message": "Notification published"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error publishing thread_message_added: {e}", exc_info=True)
         raise HTTPException(
@@ -159,6 +168,8 @@ async def notify_thread_status(
         logger.info(f"Published thread_status_updated for user {request.user_id}")
         return {"status": "success", "message": "Notification published"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error publishing thread_status_updated: {e}", exc_info=True)
         raise HTTPException(
@@ -185,6 +196,8 @@ async def notify_balance_updated(
         logger.info(f"Published balance_updated for user {request.user_id}")
         return {"status": "success", "message": "Balance notification published"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error publishing balance_updated: {e}", exc_info=True)
         raise HTTPException(

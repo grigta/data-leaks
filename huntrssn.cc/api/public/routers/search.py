@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Set
 import json
 import logging
 import asyncio
+import os
 import random
 import time
 from decimal import Decimal
@@ -578,6 +579,8 @@ def _run_clickhouse_search(
                 ssn_matches = fallback_matches
             else:
                 logger.info("Fallback: no matches by address+DOB+firstname")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error during fallback search: {e}", exc_info=True)
 
@@ -1018,7 +1021,9 @@ async def instant_ssn_search(
         if ssn_matches and len(ssn_matches) > 0:
             # SSN found — use local DB data, fallback to API data
             for ssn_record in ssn_matches:
-                logger.info(f"SSN record from DB: {ssn_record}")
+                _ssn_val = ssn_record.get('ssn', '')
+                _masked = f"***-**-{_ssn_val[-4:]}" if _ssn_val and len(_ssn_val) >= 4 else "N/A"
+                logger.info(f"SSN record from DB: id={ssn_record.get('id')}, SSN={_masked}")
                 result = InstantSSNResult(
                     firstname=ssn_record.get('firstname') or firstname,
                     lastname=ssn_record.get('lastname') or lastname,
@@ -1189,6 +1194,8 @@ async def instant_ssn_search(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in instant_ssn_search: {str(e)}", exc_info=True)
         search_log.error_message = f"Unexpected error: {str(e)}"
@@ -1535,6 +1542,8 @@ async def debug_flow_search(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"API error: {e.message}"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in debug_flow: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -1804,6 +1813,8 @@ async def test_search(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"SearchBug API error: {e.message}"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in test_search: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -1871,8 +1882,14 @@ async def _notify_worker_new_ticket():
     """Notify worker_api about a new ticket so it can push to connected workers."""
     try:
         import httpx
+        _internal_key = os.getenv("INTERNAL_API_KEY", "")
         async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post("http://worker_api:8003/internal/notify-new-ticket")
+            await client.post(
+                "http://worker_api:8003/internal/notify-new-ticket",
+                headers={"X-Internal-Api-Key": _internal_key}
+            )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to notify worker_api about new ticket: {e}")
 
@@ -2227,6 +2244,8 @@ async def _run_search_background(
             except Exception:
                 logger.critical(f"Failed to refund after API error for user {user_id}")
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Unexpected error in background search: {str(e)}", exc_info=True)
             try:
@@ -2460,6 +2479,8 @@ async def search_db(
             count=len(records)
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Search DB error: {str(e)}", exc_info=True)
         raise HTTPException(

@@ -2,11 +2,14 @@
 Worker authentication router.
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from api.common.database import get_postgres_session as get_db
 from api.common.models_postgres import User
@@ -15,6 +18,27 @@ from api.worker.dependencies import get_current_worker_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Worker Authentication"])
+
+
+def _get_client_ip(request: Request) -> str:
+    """Extract real client IP from Cloudflare or proxy headers."""
+    return (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+
+
+_redis_url = os.getenv("REDIS_URL", "")
+if _redis_url:
+    try:
+        from slowapi import Limiter
+        from limits.storage import RedisStorage
+        worker_limiter = Limiter(key_func=_get_client_ip, storage_uri=_redis_url)
+    except Exception:
+        worker_limiter = Limiter(key_func=_get_client_ip)
+else:
+    worker_limiter = Limiter(key_func=_get_client_ip)
 
 
 class WorkerUserResponse(BaseModel):
@@ -32,7 +56,9 @@ class AccessCodeLogin(BaseModel):
 
 
 @router.post("/login", response_model=Token)
+@worker_limiter.limit("5/minute")
 async def worker_login(
+    request: Request,
     body: AccessCodeLogin,
     db: AsyncSession = Depends(get_db)
 ):

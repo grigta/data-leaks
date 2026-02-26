@@ -11,7 +11,7 @@ from uuid import UUID
 from decimal import Decimal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, update, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,7 @@ router = APIRouter(tags=["Worker Tickets"])
 
 ADMIN_API_URL = os.getenv("ADMIN_API_URL", "http://admin_api:8002")
 PUBLIC_API_URL = os.getenv("PUBLIC_API_URL", "http://public_api:8000")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 
 async def _notify_ticket_update(ticket: ManualSSNTicket, event: str):
@@ -44,14 +45,18 @@ async def _notify_ticket_update(ticket: ManualSSNTicket, event: str):
         "updated_at": ticket.updated_at.isoformat(),
     }
 
+    internal_headers = {"X-Internal-Api-Key": INTERNAL_API_KEY}
     async with httpx.AsyncClient(timeout=5.0) as client:
         # Notify Admin API (internal Docker URL, no /api/admin/ prefix)
         try:
             await client.post(
                 f"{ADMIN_API_URL}/internal/notify-ticket-updated",
-                json={"ticket_data": ticket_data}
+                json={"ticket_data": ticket_data},
+                headers=internal_headers
             )
             logger.info(f"Notified admin API: {event} for ticket {ticket.id}")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to notify admin API about {event}: {e}")
 
@@ -63,9 +68,12 @@ async def _notify_ticket_update(ticket: ManualSSNTicket, event: str):
                 public_endpoint = "/internal/notify-ticket-updated"
             await client.post(
                 f"{PUBLIC_API_URL}{public_endpoint}",
-                json={"user_id": str(ticket.user_id), "ticket_data": ticket_data}
+                json={"user_id": str(ticket.user_id), "ticket_data": ticket_data},
+                headers=internal_headers
             )
             logger.info(f"Notified public API: {event} for user {ticket.user_id}")
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to notify public API about {event}: {e}")
 
@@ -84,6 +92,8 @@ async def _increment_shift_counter(db: AsyncSession, worker_id, field: str):
         if shift:
             setattr(shift, field, getattr(shift, field) + 1)
             await db.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to increment shift counter: {e}")
 
@@ -187,8 +197,8 @@ def parse_worker_response(text: str) -> dict:
 
 @router.get("/unassigned", response_model=TicketListResponse)
 async def get_unassigned_tickets(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_postgres_session),
     current_user: User = Depends(get_current_worker_user)
 ):
@@ -218,6 +228,8 @@ async def get_unassigned_tickets(
             total_count=total_count
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting unassigned tickets: {e}")
         raise HTTPException(
@@ -229,8 +241,8 @@ async def get_unassigned_tickets(
 @router.get("/my", response_model=TicketListResponse)
 async def get_my_tickets(
     status_filter: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_postgres_session),
     current_user: User = Depends(get_current_worker_user)
 ):
@@ -285,6 +297,8 @@ async def get_my_tickets(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting worker tickets: {e}")
         raise HTTPException(
@@ -296,8 +310,8 @@ async def get_my_tickets(
 @router.get("/history", response_model=HistoryResponse)
 async def get_history(
     period: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_postgres_session),
     current_user: User = Depends(get_current_worker_user)
 ):
@@ -371,6 +385,8 @@ async def get_history(
             )
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting worker history: {e}")
         raise HTTPException(
@@ -446,6 +462,8 @@ async def claim_ticket(
     except HTTPException:
         await db.rollback()
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error claiming ticket {ticket_id}: {e}")
         await db.rollback()
@@ -484,6 +502,8 @@ async def get_ticket(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -593,6 +613,8 @@ async def update_ticket(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error updating ticket {ticket_id}: {e}")
@@ -628,6 +650,7 @@ async def respond_to_ticket(
                 selectinload(ManualSSNTicket.worker)
             )
             .where(ManualSSNTicket.id == ticket_id)
+            .with_for_update()
         )
         ticket = result.scalar_one_or_none()
 
@@ -724,7 +747,8 @@ async def respond_to_ticket(
         )
         ticket = result.scalar_one()
 
-        logger.info(f"Ticket {ticket.id} responded by worker {current_user.username}: SSN={parsed['ssn']}")
+        masked_ssn = f"***-**-{parsed['ssn'][-4:]}" if parsed['ssn'] else "N/A"
+        logger.info(f"Ticket {ticket.id} responded by worker {current_user.username}: SSN={masked_ssn}")
 
         # Increment shift counter
         await _increment_shift_counter(db, current_user.id, 'tickets_completed')
@@ -740,6 +764,8 @@ async def respond_to_ticket(
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -769,6 +795,7 @@ async def reject_ticket(
                 selectinload(ManualSSNTicket.worker)
             )
             .where(ManualSSNTicket.id == ticket_id)
+            .with_for_update()
         )
         ticket = result.scalar_one_or_none()
 
@@ -846,13 +873,18 @@ async def reject_ticket(
             async with httpx.AsyncClient(timeout=5.0) as client:
                 await client.post(
                     f"{PUBLIC_API_URL}/internal/notify-balance-updated",
-                    json={"user_id": str(ticket.user_id), "balance_data": {"reason": "ticket_refund", "amount": str(search_price)}}
+                    json={"user_id": str(ticket.user_id), "balance_data": {"reason": "ticket_refund", "amount": str(search_price)}},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
                 )
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to notify balance update: {e}")
 
         return TicketResponse.from_ticket(ticket)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

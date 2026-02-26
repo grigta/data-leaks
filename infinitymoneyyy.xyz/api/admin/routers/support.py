@@ -23,6 +23,7 @@ from api.admin.websocket import ws_manager
 
 # Public API internal URL for cross-service notifications (admin → user)
 PUBLIC_API_INTERNAL_URL = os.getenv("PUBLIC_API_INTERNAL_URL", "http://public_api:8000")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -256,6 +257,8 @@ async def get_support_threads(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving support threads: {e}")
         raise HTTPException(
@@ -293,6 +296,8 @@ async def get_unread_threads_count(
 
         return {"count": count}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting unread thread count: {e}")
         raise HTTPException(
@@ -347,6 +352,8 @@ async def get_support_thread_details(
 
         return ThreadResponse.from_thread(thread, unread_count)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -416,6 +423,8 @@ async def get_thread_messages(
             total_count=total_count or 0
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -510,15 +519,20 @@ async def reply_to_thread(
                 async with http_session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/notify-thread-message",
                     json={"user_id": str(thread.user_id), "message_data": message_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     if resp.status != 200:
                         logger.error(f"Failed to notify public_api about thread message: HTTP {resp.status}")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying public_api about thread message: {notify_error}")
 
         return MessageResponse.from_message(new_message, responded_by_username=current_user.username)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -594,10 +608,13 @@ async def update_thread_status(
                 async with http_session.post(
                     f"{PUBLIC_API_INTERNAL_URL}/internal/notify-thread-status",
                     json={"user_id": str(thread.user_id), "status_data": status_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     if resp.status != 200:
                         logger.error(f"Failed to notify public_api about thread status: HTTP {resp.status}")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying public_api about thread status: {notify_error}")
 
@@ -613,6 +630,8 @@ async def update_thread_status(
 
         return ThreadResponse.from_thread(thread, unread_count)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -683,6 +702,8 @@ async def mark_thread_messages_as_read(
 
         return {"success": True, "updated_count": updated_count}
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

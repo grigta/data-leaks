@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Optional, List
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Worker Wallet"])
 
 ADMIN_API_URL = os.getenv("ADMIN_API_URL", "http://admin_api:8002")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 
 # --- Pydantic models ---
@@ -198,6 +199,7 @@ async def create_withdraw(
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.post(
                 f"{ADMIN_API_URL}/api/admin/internal/notify-invoice-created",
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                 json={
                     "invoice_data": {
                         "id": str(invoice.id),
@@ -210,6 +212,8 @@ async def create_withdraw(
                     }
                 },
             )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to notify admin about new invoice: {e}")
 
@@ -226,8 +230,8 @@ async def create_withdraw(
 
 @router.get("/invoices", response_model=InvoiceListResponse)
 async def get_invoices(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_worker_user),
     db: AsyncSession = Depends(get_db),
 ):

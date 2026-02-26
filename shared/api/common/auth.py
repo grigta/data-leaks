@@ -16,7 +16,14 @@ from pydantic import BaseModel, EmailStr, Field
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
-JWT_SECRET = os.getenv('JWT_SECRET', 'change_me_long_random_string_min_32_chars')
+_jwt_secret_raw = os.getenv('JWT_SECRET', '')
+_JWT_SECRET_DEFAULT = 'change_me_long_random_string_min_32_chars'
+if not _jwt_secret_raw or _jwt_secret_raw == _JWT_SECRET_DEFAULT:
+    raise ValueError(
+        "JWT_SECRET environment variable must be set to a strong random value. "
+        "Do not use the default placeholder."
+    )
+JWT_SECRET = _jwt_secret_raw
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
 

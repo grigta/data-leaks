@@ -23,6 +23,7 @@ from api.public.websocket import ws_manager
 
 # Admin API internal URL for cross-service notifications
 ADMIN_API_INTERNAL_URL = os.getenv("ADMIN_API_INTERNAL_URL", "http://admin_api:8002")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -187,15 +188,20 @@ async def create_support_thread(
                 async with session.post(
                     f"{ADMIN_API_INTERNAL_URL}/internal/notify-thread-created",
                     json={"thread_data": thread_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     if resp.status != 200:
                         logger.error(f"Failed to notify Admin API about thread: HTTP {resp.status}")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying Admin API about thread creation: {notify_error}")
 
         return ThreadResponse.from_thread(new_thread, unread_count=0)
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating support thread: {e}")
@@ -322,6 +328,8 @@ async def get_support_threads(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving support threads: {e}")
         raise HTTPException(
@@ -383,6 +391,8 @@ async def get_support_thread_details(
 
         return ThreadResponse.from_thread(thread, unread_count)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -458,6 +468,8 @@ async def get_thread_messages(
             total_count=total_count or 0
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -547,15 +559,20 @@ async def add_thread_message(
                 async with session.post(
                     f"{ADMIN_API_INTERNAL_URL}/internal/notify-thread-message",
                     json={"message_data": message_data},
+                    headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
                     timeout=aiohttp.ClientTimeout(total=5)
                 ) as resp:
                     if resp.status != 200:
                         logger.error(f"Failed to notify Admin API about thread message: HTTP {resp.status}")
+        except HTTPException:
+            raise
         except Exception as notify_error:
             logger.error(f"Error notifying Admin API about thread message: {notify_error}")
 
         return MessageResponse.from_message(new_message)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -632,6 +649,8 @@ async def mark_thread_messages_as_read(
 
         return {"success": True, "updated_count": updated_count}
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

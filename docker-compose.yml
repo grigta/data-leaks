@@ -208,6 +208,8 @@ services:
       UVICORN_WORKERS: 1  # Must be 1 for in-memory WebSocket manager
       ADMIN_API_URL: ${ADMIN_API_URL:-http://admin_api:8002}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://public_api:8000}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ./qwertyworkforever.top/api:/app/api
       - ./shared/api/common:/app/api/common

@@ -16,6 +16,7 @@ from api.common.models_postgres import User
 from api.worker.dependencies import get_current_worker_user
 
 ADMIN_API_URL = os.getenv("ADMIN_API_URL", "http://admin_api:8002")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "")
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Schedule"])
@@ -96,8 +97,11 @@ async def _notify_admin_schedule_update(user: User):
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.post(
                 f"{ADMIN_API_URL}/internal/notify-schedule-updated",
-                json={"schedule_data": schedule_data}
+                json={"schedule_data": schedule_data},
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY}
             )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning(f"Failed to notify admin about schedule update: {e}")
 
