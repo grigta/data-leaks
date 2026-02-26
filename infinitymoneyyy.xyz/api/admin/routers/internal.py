@@ -7,17 +7,16 @@ These endpoints are only accessible within the Docker network.
 import logging
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from api.common.security import verify_internal_api_key
 from api.admin.websocket import ws_manager
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 # Router instance
-router = APIRouter(prefix="/internal", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
+router = APIRouter(prefix="/internal", tags=["Internal"])
 
 
 class NotifyTicketRequest(BaseModel):

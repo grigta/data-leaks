@@ -2,20 +2,18 @@
 Database connection management for PostgreSQL and SQLite.
 """
 import os
+import logging
 from typing import AsyncGenerator
 from contextlib import contextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from database.db_schema import get_connection, close_connection, DEFAULT_DB_PATH
 
+logger = logging.getLogger(__name__)
+
 # PostgreSQL configuration
-_database_url_raw = os.getenv('DATABASE_URL', '')
-_DATABASE_URL_DEFAULT = 'postgresql+asyncpg://ssn_user:password@localhost:5432/ssn_users'
-if not _database_url_raw or _database_url_raw == _DATABASE_URL_DEFAULT:
-    raise ValueError(
-        "DATABASE_URL environment variable must be set. "
-        "Do not use the default placeholder with hardcoded credentials."
-    )
-DATABASE_URL = _database_url_raw
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://ssn_user:change_me_strong_password@postgres:5432/ssn_users')
+if 'change_me' in DATABASE_URL:
+    logger.warning("DATABASE_URL contains default password. Set a strong password in production.")
 
 # SQLite configuration
 SQLITE_PATH = os.getenv('SQLITE_PATH', DEFAULT_DB_PATH)

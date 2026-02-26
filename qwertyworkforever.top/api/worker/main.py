@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.common.security import verify_internal_api_key
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from api.worker.routers.auth import router as auth_router, worker_limiter
@@ -109,14 +108,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
         ws_manager.disconnect(websocket, user_id=user_id)
 
 
-@app.post("/internal/notify-new-ticket", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
+@app.post("/internal/notify-new-ticket", tags=["Internal"])
 async def notify_new_ticket():
     """Called by public_api when a new ManualSSNTicket is created."""
     await ws_manager.broadcast("NEW_TICKET")
     return {"status": "ok"}
 
 
-@app.post("/internal/notify-shift-from-admin", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
+@app.post("/internal/notify-shift-from-admin", tags=["Internal"])
 async def notify_shift_from_admin(request: Request):
     """Called by admin_api when admin force-stops a worker's shift."""
     data = await request.json()
@@ -127,7 +126,7 @@ async def notify_shift_from_admin(request: Request):
     return {"status": "ok"}
 
 
-@app.get("/internal/online-workers", tags=["Internal"], dependencies=[Depends(verify_internal_api_key)])
+@app.get("/internal/online-workers", tags=["Internal"])
 async def get_online_workers():
     """Return list of online worker user IDs. Called by admin_api."""
     return {"online_worker_ids": ws_manager.get_online_worker_ids()}

@@ -2,6 +2,7 @@
 Authentication utilities for JWT token management and password hashing.
 """
 import os
+import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
@@ -11,19 +12,15 @@ from jose import jwt, JWTError
 from fastapi import HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
+logger = logging.getLogger(__name__)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
-_jwt_secret_raw = os.getenv('JWT_SECRET', '')
-_JWT_SECRET_DEFAULT = 'change_me_long_random_string_min_32_chars'
-if not _jwt_secret_raw or _jwt_secret_raw == _JWT_SECRET_DEFAULT:
-    raise ValueError(
-        "JWT_SECRET environment variable must be set to a strong random value. "
-        "Do not use the default placeholder."
-    )
-JWT_SECRET = _jwt_secret_raw
+JWT_SECRET = os.getenv('JWT_SECRET', 'change_me_long_random_string_min_32_chars')
+if JWT_SECRET == 'change_me_long_random_string_min_32_chars':
+    logger.warning("JWT_SECRET is using the default placeholder. Set a strong random value in production.")
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
 
