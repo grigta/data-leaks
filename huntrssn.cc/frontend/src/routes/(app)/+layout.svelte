@@ -37,6 +37,8 @@
 	import { ANIMATION_DURATIONS } from '$lib/constants/animations';
 	import { currentLanguage } from '$lib/stores/language';
 	import { currentTheme } from '$lib/stores/theme';
+	import { dateFormat } from '$lib/stores/dateFormat';
+	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import { t } from '$lib/i18n';
 	import { toast } from 'svelte-sonner';
 	import { isAuthenticated } from '$lib/stores/auth';
@@ -224,6 +226,17 @@
 						title={$currentLanguage === 'en' ? 'Русский' : 'English'}
 					>
 						<Globe class="h-4 w-4 text-muted-foreground" />
+					</button>
+
+					<!-- Date Format Toggle -->
+					<button
+						onclick={() => dateFormat.toggle()}
+						class="h-8 rounded-md px-1.5 flex items-center justify-center gap-1 hover:bg-accent transition-colors duration-normal"
+						aria-label="Toggle date format"
+						title={$dateFormat === 'ddmm' ? 'DD/MM → MM/DD' : 'MM/DD → DD/MM'}
+					>
+						<CalendarDays class="h-3.5 w-3.5 text-muted-foreground" />
+						<span class="text-xs text-muted-foreground font-medium">{$dateFormat === 'ddmm' ? 'DD/MM' : 'MM/DD'}</span>
 					</button>
 
 					<!-- Theme Toggle -->

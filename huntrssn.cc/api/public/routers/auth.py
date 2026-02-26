@@ -60,6 +60,8 @@ async def _generate_unique_invitation_code(db: AsyncSession, user: User) -> str:
                 await db.refresh(user)
                 logger.info(f"Generated invitation code for user {user.username}")
                 return invitation_code
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Attempt {attempt + 1} to generate invitation code failed: {e}")
             if attempt == max_attempts - 1:
@@ -169,6 +171,8 @@ async def validate_coupon(
             message="Coupon is valid"
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error validating coupon: {e}")
         raise HTTPException(

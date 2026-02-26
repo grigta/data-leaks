@@ -248,6 +248,8 @@ async def instant_purchase(
             items_count=len(order_items)
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(

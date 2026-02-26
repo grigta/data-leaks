@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { getOrders, getOrderDetails, getTestSearchHistory, type OrderSummary, type OrderDetailResponse, type OrderItemResponse, type SSNRecord, type TestSearchHistoryItem } from '$lib/api/client';
-	import { formatCurrency, formatDate, maskSSN, getStatusBadgeClass, formatDOBISO, formatSSN, formatPhone } from '$lib/utils';
+	import { formatCurrency, formatDate, maskSSN, getStatusBadgeClass, formatDOBISO, formatSSN, formatPhone, formatDOB } from '$lib/utils';
+	import { dateFormat } from '$lib/stores/dateFormat';
 	import { markOrdersAsViewed } from '$lib/stores/orders';
 	import { t } from '$lib/i18n';
 	import { ORDERS_PAGE_SIZE, ORDERS_FETCH_LIMIT, ORDERS_EXPORT_PAGE_SIZE } from '$lib/types/orders';
@@ -145,32 +146,6 @@
 		return grouped;
 	}
 
-	function formatDOBddmmyyyy(dob: string): string {
-		if (!dob) return '';
-		// YYYYMMDD (from DB)
-		if (/^\d{8}$/.test(dob)) {
-			const day = dob.substring(6, 8);
-			const month = dob.substring(4, 6);
-			const year = dob.substring(0, 4);
-			return `${day}/${month}/${year}`;
-		}
-		// YYYY-MM-DD
-		if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-			const [year, month, day] = dob.split('-');
-			return `${day}/${month}/${year}`;
-		}
-		// MM/DD/YYYY (from SearchBug)
-		if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dob)) {
-			const [month, day, year] = dob.split('/');
-			return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-		}
-		// MM-DD-YYYY
-		if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dob)) {
-			const [month, day, year] = dob.split('-');
-			return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-		}
-		return dob;
-	}
 
 	function formatFullAddress(details: SSNRecord): string {
 		// Combine address components into single string
@@ -200,13 +175,12 @@
 		const middlename = item.middlename || item.ssn_details?.middlename || '';
 		const lastname = item.lastname || item.ssn_details?.lastname || '';
 		const rawDob = item.dob || item.ssn_details?.dob || '';
-		const dob = rawDob ? formatDOBddmmyyyy(rawDob) : '';
+		const dob = rawDob ? formatDOB(rawDob, $dateFormat) : '';
 		const address = formatFullAddressFromItem(item);
-		const email = item.email || item.ssn_details?.email || '';
-		const phone = item.phone ? formatPhone(item.phone) : item.ssn_details?.phone ? formatPhone(item.ssn_details.phone) : '';
 		const ssn = item.ssn ? formatSSN(item.ssn) : '';
+		const fullname = [firstname, middlename, lastname].filter(Boolean).join(' ');
 
-		return [firstname, middlename, lastname, dob, address, email, phone, ssn].join('\t');
+		return [fullname, address, ssn, dob].filter(Boolean).join('\n');
 	}
 
 	function csvEscape(value: string): string {
@@ -384,7 +358,7 @@
 		const address = formatFullAddressFromItem(item);
 		const ssn = item.ssn ? formatSSN(item.ssn) : '';
 		const rawDob = item.dob || item.ssn_details?.dob || '';
-		const dob = rawDob ? formatDOBddmmyyyy(rawDob) : '';
+		const dob = rawDob ? formatDOB(rawDob, $dateFormat) : '';
 		return `${fullname}\n${address}\n${ssn}\n${dob}`;
 	}
 
@@ -595,12 +569,11 @@
 		const firstname = item.firstname || item.ssn_details?.firstname || '';
 		const middlename = item.middlename || item.ssn_details?.middlename || '';
 		const lastname = item.lastname || item.ssn_details?.lastname || '';
-		const dob = item.dob ? formatDOBddmmyyyy(item.dob) : item.ssn_details?.dob ? formatDOBddmmyyyy(item.ssn_details.dob) : '';
+		const dob = item.dob ? formatDOB(item.dob, $dateFormat) : item.ssn_details?.dob ? formatDOB(item.ssn_details.dob, $dateFormat) : '';
 		const address = formatFullAddressFromItem(item);
-		const email = item.email || item.ssn_details?.email || '';
-		const phone = item.phone ? formatPhone(item.phone) : item.ssn_details?.phone ? formatPhone(item.ssn_details.phone) : '';
 		const ssn = item.ssn ? formatSSN(item.ssn) : '';
-		return [firstname, middlename, lastname, dob, address, email, phone, ssn].join('\t');
+		const fullname = [firstname, middlename, lastname].filter(Boolean).join(' ');
+		return [fullname, address, ssn, dob].filter(Boolean).join('\n');
 	}
 
 	async function handleRowRightClick(e: MouseEvent, item: FlattenedItem) {
@@ -715,7 +688,7 @@
 									{@const lastname = item.lastname || item.ssn_details?.lastname || ''}
 									{@const fullName = [firstname, middlename, lastname].filter(Boolean).join(' ') || '-'}
 									{@const fullAddress = formatFullAddressFromItem(item)}
-									{@const dob = item.dob ? formatDOBddmmyyyy(item.dob) : item.ssn_details?.dob ? formatDOBddmmyyyy(item.ssn_details.dob) : '-'}
+									{@const dob = item.dob ? formatDOB(item.dob, $dateFormat) : item.ssn_details?.dob ? formatDOB(item.ssn_details.dob, $dateFormat) : '-'}
 									<TableRow oncontextmenu={(e) => handleRowRightClick(e, item)}>
 										<TableCell class="w-12 text-center">
 											<Checkbox
@@ -782,24 +755,31 @@
 				</CardContent>
 			</Card>
 
-			<!-- Pagination -->
-			{#if totalPages > 1}
+			<!-- Pagination & Total -->
+			{#if allItems.length > 0}
 				<div class="flex items-center justify-between">
 					<div class="text-sm text-muted-foreground">
-						{$t('orders.pagination.page').replace('{{current}}', String(currentPage + 1)).replace('{{total}}', String(totalPages))}
+						{#if totalPages > 1}
+							{$t('orders.pagination.page', { current: currentPage + 1, total: totalPages })}
+						{/if}
 					</div>
-					<div class="flex gap-2">
-						<Button variant="outline" onclick={() => goToPage(currentPage - 1)} disabled={currentPage === 0}>
-							{$t('orders.pagination.previous')}
-						</Button>
-						<Button
-							variant="outline"
-							onclick={() => goToPage(currentPage + 1)}
-							disabled={currentPage >= totalPages - 1}
-						>
-							{$t('orders.pagination.next')}
-						</Button>
+					<div class="text-sm text-muted-foreground">
+						{$t('orders.pagination.totalRecords', { count: allItems.length })}
 					</div>
+					{#if totalPages > 1}
+						<div class="flex gap-2">
+							<Button variant="outline" onclick={() => goToPage(currentPage - 1)} disabled={currentPage === 0}>
+								{$t('orders.pagination.previous')}
+							</Button>
+							<Button
+								variant="outline"
+								onclick={() => goToPage(currentPage + 1)}
+								disabled={currentPage >= totalPages - 1}
+							>
+								{$t('orders.pagination.next')}
+							</Button>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		{/if}

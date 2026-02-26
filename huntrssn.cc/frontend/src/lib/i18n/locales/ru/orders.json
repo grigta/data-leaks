@@ -67,7 +67,8 @@
 	"pagination": {
 		"page": "Страница {{current}} из {{total}}",
 		"previous": "Предыдущая",
-		"next": "Следующая"
+		"next": "Следующая",
+		"totalRecords": "Всего: {{count}} записей"
 	},
 	"messages": {
 		"loadFailed": "Не удалось загрузить заказы",

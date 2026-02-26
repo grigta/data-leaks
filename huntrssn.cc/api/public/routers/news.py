@@ -65,6 +65,8 @@ async def get_news_list(
             limit=limit,
             offset=offset
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching news list")
         raise HTTPException(status_code=500, detail="Failed to fetch news list")

@@ -198,6 +198,8 @@ async def create_custom_pricing(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating custom pricing: {e}")
@@ -281,6 +283,8 @@ async def list_custom_pricing(
             total_count=total_count
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing custom pricing: {e}")
         raise HTTPException(
@@ -318,6 +322,8 @@ async def get_custom_pricing(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting custom pricing {custom_pricing_id}: {e}")
         raise HTTPException(
@@ -348,6 +354,8 @@ async def get_custom_pricing_by_code(
 
         return [CustomPricingResponse.from_custom_pricing(p) for p in pricing_list]
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting custom pricing by code {access_code}: {e}")
         raise HTTPException(
@@ -378,6 +386,8 @@ async def get_custom_pricing_by_user(
 
         return [CustomPricingResponse.from_custom_pricing(p) for p in pricing_list]
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting custom pricing by user_id {user_id}: {e}")
         raise HTTPException(
@@ -428,6 +438,8 @@ async def update_custom_pricing(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error updating custom pricing {custom_pricing_id}: {e}")
@@ -468,6 +480,8 @@ async def delete_custom_pricing(
         logger.info(f"Admin {admin_user.username} deleted custom pricing {custom_pricing_id}")
         return {"message": "Custom pricing deleted successfully"}
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -513,6 +527,8 @@ async def toggle_custom_pricing(
         logger.info(f"Admin {admin_user.username} toggled custom pricing {custom_pricing_id} to {pricing.is_active}")
         return CustomPricingResponse.from_custom_pricing(pricing)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

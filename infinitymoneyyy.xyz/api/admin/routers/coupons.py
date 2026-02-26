@@ -239,6 +239,8 @@ async def create_coupon(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating coupon: {e}")
@@ -289,6 +291,8 @@ async def list_coupons(
             total_count=total_count
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing coupons: {e}")
         raise HTTPException(
@@ -334,6 +338,8 @@ async def get_coupon_stats(
             total_bonus_given=total_bonus_given
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting coupon stats: {e}")
         raise HTTPException(
@@ -365,6 +371,8 @@ async def get_coupon(
 
         return CouponResponse.from_coupon(coupon)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -404,6 +412,8 @@ async def get_coupon_by_code(
 
         return CouponResponse.from_coupon(coupon)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -539,6 +549,8 @@ async def update_coupon(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error updating coupon {coupon_id}: {e}")
@@ -587,6 +599,8 @@ async def delete_coupon(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error deleting coupon {coupon_id}: {e}")
@@ -626,6 +640,8 @@ async def deactivate_coupon(
         logger.info(f"Admin {admin_user.username} deactivated coupon {coupon.code}")
         return CouponResponse.from_coupon(coupon)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -714,6 +730,8 @@ async def get_coupon_users(
 
         return CouponUsersResponse(users=users, total_count=total_count)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

@@ -211,6 +211,8 @@ async def get_sms_services(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="SMS service temporarily unavailable"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error loading SMS services: {e}")
         if _services_cache:
@@ -373,6 +375,8 @@ async def get_sms_number(
                     detail="SMS service error. Please try again later."
                 )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

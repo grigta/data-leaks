@@ -109,6 +109,8 @@ async def get_banned_users(
             total_count=total_count
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing banned users: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -171,6 +173,8 @@ async def unban_user(
             username=user.username
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -240,6 +244,8 @@ async def ban_user(
             banned_at=ban_time.isoformat()
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -318,6 +324,8 @@ async def add_user_balance(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error adding balance to user {user_id}: {str(e)}", exc_info=True)
@@ -363,6 +371,8 @@ async def set_user_search_mode(
             search_mode=request.search_mode,
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

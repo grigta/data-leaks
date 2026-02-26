@@ -81,6 +81,8 @@ async def create_news(
         return NewsResponse.from_news(news_with_author)
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating news: {str(e)}")
@@ -113,6 +115,8 @@ async def list_news(
             news=[NewsResponse.from_news(news) for news in news_list],
             total_count=total_count
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing news: {str(e)}")
         raise HTTPException(
@@ -140,6 +144,8 @@ async def get_news(
             )
 
         return NewsResponse.from_news(news)
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -187,6 +193,8 @@ async def update_news(
         return NewsResponse.from_news(news_with_author)
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error updating news {news_id}: {str(e)}")
@@ -219,6 +227,8 @@ async def delete_news(
 
         logger.info(f"Admin {admin_user.username} deleted news {news_id}")
         return {"message": "News deleted successfully"}
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

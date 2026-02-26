@@ -67,7 +67,8 @@
 	"pagination": {
 		"page": "Page {{current}} of {{total}}",
 		"previous": "Previous",
-		"next": "Next"
+		"next": "Next",
+		"totalRecords": "Total: {{count}} records"
 	},
 	"messages": {
 		"loadFailed": "Failed to load orders",

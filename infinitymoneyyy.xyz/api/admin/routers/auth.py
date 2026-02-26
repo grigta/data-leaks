@@ -491,6 +491,8 @@ async def register_worker(
                 "created_at": registration_request.created_at.isoformat()
             }
             await ws_manager.broadcast_worker_request_created(request_data)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning(f"Failed to broadcast worker registration: {e}")
 
@@ -502,6 +504,8 @@ async def register_worker(
             status="pending"
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

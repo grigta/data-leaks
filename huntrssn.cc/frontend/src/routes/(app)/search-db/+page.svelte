@@ -29,6 +29,8 @@
 	import { toast } from 'svelte-sonner';
 	import { user } from '$lib/stores/auth';
 	import { goto } from '$app/navigation';
+	import { formatDOB } from '$lib/utils';
+	import { dateFormat } from '$lib/stores/dateFormat';
 
 	// State
 	let ssn = $state('');
@@ -95,14 +97,6 @@
 		}
 	}
 
-	function formatDOB(dob: string | undefined): string {
-		if (!dob) return '-';
-		// Handle YYYYMMDD format
-		if (dob.length === 8 && /^\d{8}$/.test(dob)) {
-			return `${dob.slice(4, 6)}/${dob.slice(6, 8)}/${dob.slice(0, 4)}`;
-		}
-		return dob;
-	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !isLoading) {
@@ -212,7 +206,7 @@
 												</div>
 											</div>
 										</TableCell>
-										<TableCell class="text-sm">{formatDOB(record.dob)}</TableCell>
+										<TableCell class="text-sm">{formatDOB(record.dob || '', $dateFormat) || '-'}</TableCell>
 										<TableCell>
 											<div class="max-w-[200px] space-y-0.5 text-sm">
 												<div>{record.address || '-'}</div>

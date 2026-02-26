@@ -265,6 +265,8 @@ async def get_user_statistics(
             new_users_all_time=total_users,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -313,6 +315,8 @@ async def get_financial_statistics(
             usage_amount=total_spent,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -362,6 +366,8 @@ async def get_transaction_statistics(
             failed=row.failed or 0,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -426,6 +432,8 @@ async def get_product_statistics(
             enrichment_operations=0,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -490,6 +498,8 @@ async def get_coupon_statistics(
 
         return stats
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -641,6 +651,8 @@ async def get_users_table(
             users=users, total_count=total_count, page=offset // limit, page_size=limit
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -753,6 +765,8 @@ async def get_user_details(
             recent_transactions=recent_transactions,
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -876,6 +890,8 @@ async def get_instant_ssn_stats(
             telegram_success_rate=round(telegram_success_rate, 2)
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1036,6 +1052,8 @@ async def get_manual_ssn_stats(
             telegram_success_rate=round(telegram_success_rate, 2)
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1301,6 +1319,8 @@ async def get_profit_dashboard(
             period=period,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1337,6 +1357,8 @@ async def clear_profit_dashboard_stats(
         await db.commit()
         return {"status": "ok", "cleared": period}
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(
@@ -1569,6 +1591,8 @@ async def get_profit_users(
             page_size=limit,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

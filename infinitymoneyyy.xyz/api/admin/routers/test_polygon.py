@@ -692,6 +692,8 @@ async def _execute_test_run(
                 f"wrong_ssn={wrong_ssn}, errors={errors}"
             )
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Fatal error in test run {run_id}: {e}", exc_info=True)
             run = await db.get(TestPolygonRun, run_id)
@@ -763,6 +765,8 @@ async def _process_single_record(
                         lastname=lastname,
                         address=record.address,
                     )
+        except HTTPException:
+            raise
         except Exception as sb_err:
             logger.warning(f"SearchBug call failed for {record.fullname}: {sb_err}")
 
@@ -1033,6 +1037,8 @@ async def _process_single_record(
             "search_time": time.time() - start_time,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error processing record {record.id}: {e}", exc_info=True)
         return {

@@ -166,6 +166,8 @@ async def purchase_subscription(
 
         return subscription
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(

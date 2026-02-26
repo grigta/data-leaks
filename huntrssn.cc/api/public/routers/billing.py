@@ -306,6 +306,8 @@ async def apply_coupon(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error validating coupon: {str(e)}")
         raise HTTPException(
@@ -475,6 +477,8 @@ async def apply_coupon_to_balance(
                 new_balance=new_balance
             )
 
+        except HTTPException:
+            raise
         except Exception as commit_error:
             from sqlalchemy.exc import IntegrityError
             await db.rollback()
@@ -497,6 +501,8 @@ async def apply_coupon_to_balance(
             # Re-raise if it's not an expected integrity error
             raise
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -705,6 +711,8 @@ async def create_deposit(
         try:
             await db.commit()
             await db.refresh(new_transaction)
+        except HTTPException:
+            raise
         except Exception as commit_error:
             from sqlalchemy.exc import IntegrityError
             await db.rollback()
@@ -904,6 +912,8 @@ async def create_deposit(
             updated_at=new_transaction.updated_at.isoformat()
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(
@@ -1171,6 +1181,8 @@ async def cryptocurrencyapi_ipn(
 
                 return {"status": "success", "message": "Payment processed"}
 
+            except HTTPException:
+                raise
             except Exception as e:
                 await db.rollback()
                 logger.error(f"Error processing payment: {str(e)}", exc_info=True)
@@ -1194,6 +1206,8 @@ async def cryptocurrencyapi_ipn(
         logger.error(f"Invalid JSON in IPN: {str(e)}")
         return {"status": "error", "message": "Invalid JSON"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in IPN: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
@@ -1320,6 +1334,8 @@ async def helket_ipn(
 
                 return {"status": "success", "message": "Payment processed"}
 
+            except HTTPException:
+                raise
             except Exception as e:
                 await db.rollback()
                 logger.error(f"Error processing Helket payment: {str(e)}", exc_info=True)
@@ -1336,6 +1352,8 @@ async def helket_ipn(
         logger.error(f"Invalid JSON in Helket IPN: {str(e)}")
         return {"status": "error", "message": "Invalid JSON"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in Helket IPN: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
@@ -1441,6 +1459,8 @@ async def poll_ffio_order_status(transaction_id: UUID, db_session_factory):
                         )
                         return  # Stop polling
 
+                    except HTTPException:
+                        raise
                     except Exception as e:
                         await db.rollback()
                         logger.error(f"Error processing ff.io payment: {str(e)}", exc_info=True)
@@ -1465,6 +1485,8 @@ async def poll_ffio_order_status(transaction_id: UUID, db_session_factory):
             # Continue polling despite errors
             continue
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Unexpected error in ff.io polling for transaction {transaction_id}: {str(e)}", exc_info=True)
             # Continue polling despite errors

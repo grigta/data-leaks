@@ -19,6 +19,8 @@
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { unifiedSearch, getTestSearchHistory, handleApiError, type TestSearchHistoryItem } from '$lib/api/client';
 	import { user, setUser } from '$lib/stores/auth';
+	import { formatDOB } from '$lib/utils';
+	import { dateFormat } from '$lib/stores/dateFormat';
 	import { goto } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -93,25 +95,6 @@
 		return ssn;
 	}
 
-	function formatDOBddmmyyyy(dob: string): string {
-		if (!dob) return '';
-		if (/^\d{8}$/.test(dob)) {
-			return `${dob.substring(6, 8)}/${dob.substring(4, 6)}/${dob.substring(0, 4)}`;
-		}
-		if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-			const [year, month, day] = dob.split('-');
-			return `${day}/${month}/${year}`;
-		}
-		if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dob)) {
-			const [month, day, year] = dob.split('/');
-			return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-		}
-		if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dob)) {
-			const [month, day, year] = dob.split('-');
-			return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-		}
-		return dob;
-	}
 
 	async function handleSearch() {
 		if (!fullName.trim() || !address.trim()) return;
@@ -173,7 +156,7 @@
 	}
 
 	async function copyHistoryRow(item: TestSearchHistoryItem, rowKey: string) {
-		const text = [item.input_fullname, item.input_address, item.ssn ? formatSSN(item.ssn) : '', item.dob ? formatDOBddmmyyyy(item.dob) : '']
+		const text = [item.input_fullname, item.input_address, item.ssn ? formatSSN(item.ssn) : '', item.dob ? formatDOB(item.dob, $dateFormat) : '']
 			.filter(Boolean)
 			.join('\t');
 		try {
@@ -194,7 +177,7 @@
 	async function handleRowRightClick(e: MouseEvent, item: TestSearchHistoryItem) {
 		if (item.status === 'processing') return;
 		e.preventDefault();
-		const text = [item.input_fullname, item.input_address, item.ssn ? formatSSN(item.ssn) : '', item.dob ? formatDOBddmmyyyy(item.dob) : '']
+		const text = [item.input_fullname, item.input_address, item.ssn ? formatSSN(item.ssn) : '', item.dob ? formatDOB(item.dob, $dateFormat) : '']
 			.filter(Boolean)
 			.join('\t');
 		try {
@@ -320,7 +303,7 @@
 								<!-- Status -->
 								<TableCell class="text-center">
 									{#if item.status === 'processing'}
-										<Clock class="mx-auto h-5 w-5 animate-pulse text-yellow-500" />
+										<Clock class="mx-auto h-5 w-5 text-yellow-500" />
 									{:else if item.status === 'done'}
 										<CheckCircle class="mx-auto h-5 w-5 text-green-500" />
 									{:else if item.status === 'nf'}
@@ -369,12 +352,12 @@
 								<!-- DOB -->
 								<TableCell
 									class="cursor-pointer text-center text-sm transition-all duration-150"
-									onclick={() => item.dob && copyCellValue(formatDOBddmmyyyy(item.dob), `hist-${item.id}-dob`)}
+									onclick={() => item.dob && copyCellValue(formatDOB(item.dob, $dateFormat), `hist-${item.id}-dob`)}
 								>
 									{#if copiedCell === `hist-${item.id}-dob`}
 										Copied
 									{:else if item.dob}
-										{formatDOBddmmyyyy(item.dob)}
+										{formatDOB(item.dob, $dateFormat)}
 									{:else if item.status === 'processing'}
 										...
 									{:else}
@@ -385,7 +368,7 @@
 								<!-- Time -->
 								<TableCell class="text-center text-sm text-muted-foreground">
 									{#if item.search_time != null}
-										{item.search_time}s
+										{Math.round(item.search_time)}s
 									{:else if item.status === 'processing'}
 										...
 									{:else}

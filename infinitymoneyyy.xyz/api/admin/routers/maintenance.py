@@ -109,6 +109,8 @@ async def create_maintenance_mode(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating maintenance mode: {e}")
@@ -157,6 +159,8 @@ async def list_maintenance_modes(
             total_count=total_count
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error listing maintenance modes: {e}")
         raise HTTPException(
@@ -197,6 +201,8 @@ async def get_maintenance_mode(
 
         return MaintenanceModeResponse.from_maintenance_mode(mode)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -254,6 +260,8 @@ async def update_maintenance_mode(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error updating maintenance mode {service_name}: {e}")
@@ -301,6 +309,8 @@ async def delete_maintenance_mode(
         logger.info(f"Admin {admin_user.username} deleted maintenance mode for {service_name}")
         return {"message": "Maintenance mode deleted successfully"}
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -351,6 +361,8 @@ async def toggle_maintenance_mode(
         logger.info(f"Admin {admin_user.username} toggled maintenance mode for {service_name} to {mode.is_active}")
         return MaintenanceModeResponse.from_maintenance_mode(mode)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

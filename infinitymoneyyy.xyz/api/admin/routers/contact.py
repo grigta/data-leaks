@@ -188,6 +188,8 @@ async def get_contact_threads(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving contact threads: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve contact threads")
@@ -206,6 +208,8 @@ async def get_unread_threads_count(
         count = await db.scalar(query) or 0
         logger.info(f"Admin {current_user.username} retrieved unread contact thread count: {count}")
         return {"count": count}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting unread thread count: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get unread thread count")
@@ -234,6 +238,8 @@ async def get_contact_thread_details(
         logger.info(f"Admin {current_user.username} retrieved contact thread {thread_id}")
         return ThreadResponse.from_thread(thread, unread_count)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -272,6 +278,8 @@ async def get_thread_messages(
 
         return MessageListResponse(messages=[MessageResponse.from_message(msg) for msg in messages], total_count=total_count or 0)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -337,6 +345,8 @@ async def reply_to_thread(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error replying to contact thread {thread_id}: {e}")
@@ -381,6 +391,8 @@ async def update_thread_status(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error updating contact thread {thread_id} status: {e}")
@@ -423,6 +435,8 @@ async def mark_thread_messages_as_read(
 
         return {"success": True, "updated_count": updated_count}
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:

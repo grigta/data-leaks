@@ -234,6 +234,37 @@ export function formatDOBISO(dob: string): string {
 }
 
 /**
+ * Format DOB for display in the selected format
+ * @param dob - Date of birth in various formats (YYYYMMDD, YYYY-MM-DD, MM/DD/YYYY, MM-DD-YYYY)
+ * @param format - 'ddmm' for DD/MM/YYYY or 'mmdd' for MM/DD/YYYY
+ */
+export function formatDOB(dob: string, format: 'mmdd' | 'ddmm' = 'ddmm'): string {
+  if (!dob) return '';
+
+  let month: string, day: string, year: string;
+
+  if (/^\d{8}$/.test(dob)) {
+    year = dob.substring(0, 4);
+    month = dob.substring(4, 6);
+    day = dob.substring(6, 8);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    [year, month, day] = dob.split('-');
+  } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dob)) {
+    [month, day, year] = dob.split('/');
+    month = month.padStart(2, '0');
+    day = day.padStart(2, '0');
+  } else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dob)) {
+    [month, day, year] = dob.split('-');
+    month = month.padStart(2, '0');
+    day = day.padStart(2, '0');
+  } else {
+    return dob;
+  }
+
+  return format === 'ddmm' ? `${day}/${month}/${year}` : `${month}/${day}/${year}`;
+}
+
+/**
  * Parse full name into firstname and lastname
  *
  * Logic:

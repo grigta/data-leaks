@@ -303,7 +303,7 @@
               disabled={isShiftLoading}
               class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
             >
-              {isShiftLoading ? '...' : 'Start Shift'}
+              {isShiftLoading ? '...' : 'Start Work'}
             </button>
           {:else}
             <span class="font-mono text-sm tabular-nums {workerStatus === 'paused' ? 'text-orange-500' : 'text-emerald-500'}">

@@ -177,6 +177,8 @@ async def create_contact_thread(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error creating contact thread: {e}")
@@ -302,6 +304,8 @@ async def get_contact_threads(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving contact threads: {e}")
         raise HTTPException(
@@ -363,6 +367,8 @@ async def get_contact_thread_details(
 
         return ThreadResponse.from_thread(thread, unread_count)
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -438,6 +444,8 @@ async def get_thread_messages(
             total_count=total_count or 0
         )
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
@@ -526,6 +534,8 @@ async def add_thread_message(
 
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error adding message to contact thread {thread_id}: {e}")
@@ -600,6 +610,8 @@ async def mark_thread_messages_as_read(
 
         return {"success": True, "updated_count": updated_count}
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
